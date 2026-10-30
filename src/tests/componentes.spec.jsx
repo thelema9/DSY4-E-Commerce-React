@@ -42,6 +42,29 @@ describe("Componente: Header", () => {
     );
   }
 
+  it("abre y cierra el menú colapsable con el botón hamburguesa", () => {
+    renderHeader({});
+    const menu = document.getElementById("menuPrincipal");
+    expect(menu.classList.contains("show")).toBeFalse();
+
+    clickBoton("Abrir menú");
+    expect(menu.classList.contains("show")).toBeTrue();
+    expect(screen.getByRole("button", { name: "Cerrar menú" }).getAttribute("aria-expanded")).toBe("true");
+
+    clickBoton("Cerrar menú");
+    expect(menu.classList.contains("show")).toBeFalse();
+    expect(screen.getByRole("button", { name: "Abrir menú" }).getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("cierra el menú colapsable al elegir un link", () => {
+    renderHeader({});
+    clickBoton("Abrir menú");
+
+    fireEvent.click(screen.getByRole("link", { name: "Carrito" }));
+
+    expect(document.getElementById("menuPrincipal").classList.contains("show")).toBeFalse();
+  });
+
   it("muestra el contador del carrito recibido por props", () => {
     renderHeader({ totalUnidades: 7 });
     expect(screen.getByRole("link", { name: "Cart (7)" })).toBeTruthy();

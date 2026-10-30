@@ -1,8 +1,12 @@
+import { useState } from "react";
 import { Link, NavLink } from "react-router-dom";
 import { ROLES } from "../data/usuarios";
 
 // Header recibe props: contador del carrito, usuario de la sesión y su handler de logout.
 export default function Header({ totalUnidades = 0, usuario = null, onCerrarSesion }) {
+  // Menú colapsable en celular: se controla con estado porque solo se carga el CSS de Bootstrap.
+  const [menuAbierto, setMenuAbierto] = useState(false);
+
   return (
     <header>
       <nav className="navbar navbar-expand-md navbar-light bg-white border-bottom">
@@ -13,15 +17,19 @@ export default function Header({ totalUnidades = 0, usuario = null, onCerrarSesi
           <button
             className="navbar-toggler"
             type="button"
-            data-bs-toggle="collapse"
-            data-bs-target="#menuPrincipal"
+            onClick={() => setMenuAbierto(!menuAbierto)}
             aria-controls="menuPrincipal"
-            aria-expanded="false"
-            aria-label="Abrir menú"
+            aria-expanded={menuAbierto}
+            aria-label={menuAbierto ? "Cerrar menú" : "Abrir menú"}
           >
             <span className="navbar-toggler-icon"></span>
           </button>
-          <div className="collapse navbar-collapse" id="menuPrincipal">
+          {/* Cualquier click dentro del menú (links, cerrar sesión) lo vuelve a cerrar. */}
+          <div
+            className={`collapse navbar-collapse ${menuAbierto ? "show" : ""}`}
+            id="menuPrincipal"
+            onClick={() => setMenuAbierto(false)}
+          >
             <ul className="navbar-nav mx-auto">
               <li className="nav-item">
                 <NavLink className="nav-link" to="/">

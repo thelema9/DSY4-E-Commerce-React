@@ -41,7 +41,7 @@ La app trae un **administrador de fábrica** (definido en `src/data/usuarios.js`
 | Formulario (registro con validaciones) | `src/pages/RegistroPage.jsx` + `src/utils/validaciones.js` |
 | Login funcional y roles | `src/pages/LoginPage.jsx` + `src/context/AuthContext.jsx` + `src/data/usuarios.js` (admin de fábrica) |
 | Gestión de datos (localStorage + useState + useContext) | `src/context/` (Auth, Productos, Carrito) con persistencia en `localStorage` |
-| Pruebas unitarias | `src/tests/`: 113 pruebas con Jasmine + Karma (ver [Pruebas unitarias](#pruebas-unitarias)) |
+| Pruebas unitarias | `src/tests/`: 115 pruebas con Jasmine + Karma (ver [Pruebas unitarias](#pruebas-unitarias)) |
 | Responsividad básica | Bootstrap 5 por CDN (navbar colapsable + grillas) + media query propia en `src/index.css` |
 
 ## Estructura
@@ -116,10 +116,10 @@ Todas siguen el patrón **Arrange / Act / Assert**: se preparan los datos (por e
 | `validaciones.spec.js` | 26 | Lógica pura de validación: email, nombre, contraseña segura, teléfono chileno, formulario de registro y de producto |
 | `storage.spec.js` | 6 | Lectura/escritura en `localStorage`, JSON corrupto y fallas del almacenamiento |
 | `contextos.spec.jsx` | 26 | Estado global: CRUD de productos, carrito (acumular, cantidades, vaciar), registro/login/logout, roles (admin de fábrica, registro siempre como cliente) y persistencia; error al usar un hook fuera de su Provider |
-| `componentes.spec.jsx` | 21 | Props y eventos de `ProductoCard`, `Header` (link "Administrar" solo para admin), `Footer`, `ProductoForm` y `RutaProtegida` (sin sesión, cliente y admin) |
+| `componentes.spec.jsx` | 23 | Props y eventos de `ProductoCard`, `Header` (link "Administrar" solo para admin, menú colapsable), `Footer`, `ProductoForm` y `RutaProtegida` (sin sesión, cliente y admin) |
 | `paginas.spec.jsx` | 29 | Comportamiento de cada página en el DOM: Home (agregar al carrito, scroll al catálogo), Login (incluye volver a `/admin` tras iniciar sesión), Registro (comunas por región, duplicados, correo del admin), Carrito (totales, cupón, +/-, pago) y Admin (crear, editar, eliminar) |
 | `app.spec.jsx` | 5 | Integración: smoke test, ruta desconocida, `/admin` sin sesión y con sesión de cliente, y el flujo completo cliente sin acceso → admin administra |
-| **Total** | **113** | |
+| **Total** | **115** | |
 
 ### Uso de mocks y spies
 
@@ -138,7 +138,7 @@ Todas siguen el patrón **Arrange / Act / Assert**: se preparan los datos (por e
 
 `npm test` imprime cada prueba con su resultado y, al final, la tabla de cobertura. El reporte HTML queda en `coverage/html/index.html` (y `coverage/lcov.info` para otras herramientas).
 
-Resultado actual: **113 de 113 pruebas aprobadas**.
+Resultado actual: **115 de 115 pruebas aprobadas**.
 
 | Métrica | Cobertura |
 |---|---|
