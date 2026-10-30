@@ -1,11 +1,13 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { esEmailValido } from "../utils/validaciones";
 
 export default function LoginPage() {
   const { iniciarSesion, sesion } = useAuth();
   const navigate = useNavigate();
+  // Si llegó redirigido desde una ruta protegida, vuelve a ella tras el login.
+  const destino = useLocation().state?.desde || "/";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [errores, setErrores] = useState({});
@@ -37,7 +39,7 @@ export default function LoginPage() {
       if (errorLogin) {
         nuevos.email = errorLogin;
       } else {
-        navigate("/");
+        navigate(destino, { replace: true });
         return;
       }
     }
@@ -63,7 +65,7 @@ export default function LoginPage() {
           <div className="card">
             <div className="card-header bg-success text-white">Inicio de sesión</div>
             <div className="card-body">
-              <form onSubmit={manejarSubmit} novalidate>
+              <form onSubmit={manejarSubmit} noValidate>
                 <div className="mb-3">
                   <label htmlFor="email" className="form-label">
                     Correo

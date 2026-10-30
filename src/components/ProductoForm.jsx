@@ -44,7 +44,7 @@ export default function ProductoForm({ productoInicial = null, onGuardar, onCanc
   }
 
   return (
-    <form onSubmit={manejarSubmit} novalidate className="border rounded p-3 bg-white">
+    <form onSubmit={manejarSubmit} noValidate className="border rounded p-3 bg-white">
       <h3 className="h6 mb-3">{productoInicial ? "Editar producto" : "Nuevo producto"}</h3>
       <div className="row g-2">
         <div className="col-md-3">

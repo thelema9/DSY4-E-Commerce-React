@@ -13,8 +13,20 @@ import RegistroPage from "./pages/RegistroPage";
 
 const CATEGORIAS_FOOTER = ["Frutas Frescas", "Verduras Orgánicas", "Productos Orgánicos"];
 
+// Providers globales de la app (exportados para reutilizarlos en las pruebas).
+export function Proveedores({ children }) {
+  return (
+    <AuthProvider>
+      <ProductosProvider>
+        <CarritoProvider>{children}</CarritoProvider>
+      </ProductosProvider>
+    </AuthProvider>
+  );
+}
+
 // Layout fuera de los providers porque necesita leer sus hooks.
-function Layout() {
+// Exportado para que las pruebas lo monten con un MemoryRouter.
+export function Layout() {
   const { sesion, cerrarSesion } = useAuth();
   const { totalUnidades } = useCarrito();
 
@@ -43,14 +55,10 @@ function Layout() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <ProductosProvider>
-        <CarritoProvider>
-          <BrowserRouter>
-            <Layout />
-          </BrowserRouter>
-        </CarritoProvider>
-      </ProductosProvider>
-    </AuthProvider>
+    <Proveedores>
+      <BrowserRouter>
+        <Layout />
+      </BrowserRouter>
+    </Proveedores>
   );
 }

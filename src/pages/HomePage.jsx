@@ -1,3 +1,5 @@
+import { useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import ProductoCard from "../components/ProductoCard";
 import { useCarrito } from "../context/CarritoContext";
 import { useProductos } from "../context/ProductosContext";
@@ -5,6 +7,13 @@ import { useProductos } from "../context/ProductosContext";
 export default function HomePage() {
   const { productos } = useProductos();
   const { agregarAlCarrito } = useCarrito();
+  const { hash, key } = useLocation();
+
+  // React Router no hace scroll a los anclas (/#catalogo): lo hacemos al navegar.
+  useEffect(() => {
+    if (!hash) return;
+    document.getElementById(hash.slice(1))?.scrollIntoView({ behavior: "smooth" });
+  }, [hash, key]);
 
   return (
     <>

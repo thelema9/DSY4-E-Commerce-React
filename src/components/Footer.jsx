@@ -35,7 +35,7 @@ export default function Footer({ categorias = [] }) {
           <div className="col-md-4">
             <h3 className="h5 text-white">Medios de pago</h3>
             <p>Débito · Crédito · Transferencia</p>
-            <form className="d-flex gap-2" onSubmit={manejarBoletin} novalidate>
+            <form className="d-flex gap-2" onSubmit={manejarBoletin} noValidate>
               <label htmlFor="email-boletin" className="visually-hidden">
                 Correo para el boletín
               </label>

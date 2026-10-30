@@ -75,7 +75,7 @@ export default function RegistroPage() {
         <div className="col-md-6">
           <h1 className="text-center mb-4">Registro de usuario</h1>
 
-          <form onSubmit={manejarSubmit} novalidate>
+          <form onSubmit={manejarSubmit} noValidate>
             <div className="mb-3">
               <label htmlFor="nombre" className="form-label">Nombre completo</label>
               <input
