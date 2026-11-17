@@ -1,0 +1,38 @@
+# EC2 de BASE DE DATOS: MySQL 8.
+# En la EC2 vive en /opt/huertohogar/database junto a un .env que escribe GitHub Actions (workflow database.yml).
+# En local: cd database && cp .env.example .env (completar) && docker compose up -d
+name: huertohogar-database
+
+services:
+  db:
+    image: mysql:8.0
+    container_name: huertohogar-db
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      TZ: America/Santiago
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+    ports:
+      # El backend se conecta desde OTRA EC2, por eso el puerto se publica.
+      # Quien protege la base es el security group: 3306 solo se permite desde el security group del backend.
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      # Solo se ejecutan la primera vez (con el volumen vacío): crean las tablas y cargan los datos iniciales.
+      - ./schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
+    healthcheck:
+      # Por TCP (127.0.0.1): durante la inicialización MySQL corre un servidor temporal sin red,
+      # así el contenedor solo queda "healthy" cuando el servidor definitivo está listo.
+      test: ["CMD-SHELL", "MYSQL_PWD=\"$$MYSQL_ROOT_PASSWORD\" mysqladmin ping -h 127.0.0.1 -u root --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 180s   # el primer arranque (crear la base) puede tardar varios minutos en una máquina chica
+
+volumes:
+  mysql_data:
+    name: huertohogar-mysql-data   # los datos sobreviven a reinicios y a nuevos despliegues

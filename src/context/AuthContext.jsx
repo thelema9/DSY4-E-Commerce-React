@@ -1,63 +1,60 @@
-import { createContext, useContext, useState } from "react";
-import { ADMIN_INICIAL, ROLES } from "../data/usuarios";
-import { CLAVE_SESION, CLAVE_USUARIOS, borrarClave, guardarClave, leerClave } from "../utils/storage";
+import { createContext, useContext, useEffect, useState } from "react";
+import { EVENTO_SESION_EXPIRADA } from "../services/api";
+import * as authService from "../services/authService";
+import { tokenExpirado } from "../utils/jwt";
+import { CLAVE_SESION, borrarClave, guardarClave, leerClave } from "../utils/storage";
 
 const AuthContext = createContext(null);
 
-// Usuarios guardados + el admin de fábrica (si aún no está en la lista).
-function cargarUsuarios() {
-  const guardados = leerClave(CLAVE_USUARIOS, []);
-  const tieneAdmin = guardados.some((u) => u.email === ADMIN_INICIAL.email);
-  return tieneAdmin ? guardados : [ADMIN_INICIAL, ...guardados];
+// Sesión guardada = { token, usuario }. Si el JWT ya venció se descarta al cargar.
+function cargarSesion() {
+  const guardada = leerClave(CLAVE_SESION, null);
+  if (!guardada?.token || !guardada?.usuario) return null;
+  if (tokenExpirado(guardada.token)) {
+    borrarClave(CLAVE_SESION);
+    return null;
+  }
+  return guardada;
 }
 
 export function AuthProvider({ children }) {
-  const [usuarios, setUsuarios] = useState(cargarUsuarios);
-  const [sesion, setSesion] = useState(() => leerClave(CLAVE_SESION, null));
+  const [sesion, setSesion] = useState(cargarSesion);
 
-  // Todo registro público crea un cliente: el rol admin no se puede pedir desde el formulario.
-  function registrarUsuario(usuario) {
-    const nuevo = {
-      ...usuario,
-      email: usuario.email.trim().toLowerCase(),
-      rol: ROLES.CLIENTE,
-      creadoEn: new Date().toISOString(),
-    };
-    const nuevos = [...usuarios, nuevo];
-    setUsuarios(nuevos);
-    guardarClave(CLAVE_USUARIOS, nuevos);
+  // Si la API responde 401 con un token, services/api.js borra la sesión y emite este evento.
+  useEffect(() => {
+    const alExpirar = () => setSesion(null);
+    window.addEventListener(EVENTO_SESION_EXPIRADA, alExpirar);
+    return () => window.removeEventListener(EVENTO_SESION_EXPIRADA, alExpirar);
+  }, []);
+
+  // Login contra el backend. Lanza ApiError si las credenciales no son válidas.
+  async function iniciarSesion(email, password) {
+    const { token, usuario } = await authService.login(email.trim().toLowerCase(), password);
+    const nueva = { token, usuario };
+    guardarClave(CLAVE_SESION, nueva);
+    setSesion(nueva);
+    return usuario;
   }
 
-  function existeUsuario(email) {
-    const buscado = email.trim().toLowerCase();
-    return usuarios.some((u) => u.email === buscado);
-  }
-
-  // Devuelve null si el login es válido, o un mensaje de error.
-  function iniciarSesion(email, password) {
-    const buscado = email.trim().toLowerCase();
-    const usuario = usuarios.find((u) => u.email === buscado);
-    if (!usuario) return "No existe una cuenta con este correo.";
-    if (usuario.password !== password) return "Contraseña incorrecta.";
-    const nuevaSesion = {
-      email: buscado,
-      nombre: usuario.nombre,
-      rol: usuario.rol || ROLES.CLIENTE, // cuentas antiguas sin rol quedan como cliente
-      inicioEn: new Date().toISOString(),
-    };
-    setSesion(nuevaSesion);
-    guardarClave(CLAVE_SESION, nuevaSesion);
-    return null;
+  // El registro público siempre crea un CLIENTE (lo garantiza el backend). No inicia sesión.
+  function registrarUsuario(datos) {
+    return authService.registrar(datos);
   }
 
   function cerrarSesion() {
-    setSesion(null);
     borrarClave(CLAVE_SESION);
+    setSesion(null);
   }
 
   return (
     <AuthContext.Provider
-      value={{ usuarios, sesion, registrarUsuario, existeUsuario, iniciarSesion, cerrarSesion }}
+      value={{
+        usuario: sesion?.usuario ?? null,
+        token: sesion?.token ?? null,
+        iniciarSesion,
+        registrarUsuario,
+        cerrarSesion,
+      }}
     >
       {children}
     </AuthContext.Provider>

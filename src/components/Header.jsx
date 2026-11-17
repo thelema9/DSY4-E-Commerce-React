@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, NavLink } from "react-router-dom";
-import { ROLES } from "../data/usuarios";
+import { ROLES } from "../utils/roles";
 
 // Header recibe props: contador del carrito, usuario de la sesión y su handler de logout.
 export default function Header({ totalUnidades = 0, usuario = null, onCerrarSesion }) {
@@ -48,11 +48,19 @@ export default function Header({ totalUnidades = 0, usuario = null, onCerrarSesi
                 </NavLink>
               </li>
               {usuario?.rol === ROLES.ADMIN && (
-                <li className="nav-item">
-                  <NavLink className="nav-link" to="/admin">
-                    Administrar
-                  </NavLink>
-                </li>
+                <>
+                  <li className="nav-item">
+                    {/* end: no queda activo cuando se está en /admin/usuarios */}
+                    <NavLink className="nav-link" to="/admin" end>
+                      Administrar
+                    </NavLink>
+                  </li>
+                  <li className="nav-item">
+                    <NavLink className="nav-link" to="/admin/usuarios">
+                      Usuarios
+                    </NavLink>
+                  </li>
+                </>
               )}
             </ul>
             <ul className="navbar-nav align-items-md-center gap-md-3">

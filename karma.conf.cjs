@@ -1,6 +1,7 @@
 // Configuración de Karma: corre las pruebas Jasmine en Chrome real.
 // Webpack + Babel compilan el JSX; babel-plugin-istanbul instrumenta src/ para la cobertura.
 const path = require("path");
+const webpack = require("webpack");
 
 module.exports = function (config) {
   config.set({
@@ -25,6 +26,13 @@ module.exports = function (config) {
       mode: "development",
       devtool: "inline-source-map",
       resolve: { extensions: [".js", ".jsx"] },
+      // Vite inyecta import.meta.env al compilar; en las pruebas (webpack) se define a mano.
+      // Las pruebas nunca llaman a un backend real: fetch se reemplaza por un backend falso.
+      plugins: [
+        new webpack.DefinePlugin({
+          "import.meta.env": JSON.stringify({ VITE_API_URL: "/api", MODE: "test" }),
+        }),
+      ],
       module: {
         rules: [
           {
@@ -76,7 +84,11 @@ module.exports = function (config) {
       ],
     },
 
-    browsers: ["ChromeHeadless"],
+    // En GitHub Actions (CI=true) Chrome corre sin sandbox, como exige el contenedor del runner.
+    customLaunchers: {
+      ChromeHeadlessCI: { base: "ChromeHeadless", flags: ["--no-sandbox"] },
+    },
+    browsers: [process.env.CI ? "ChromeHeadlessCI" : "ChromeHeadless"],
     singleRun: true,
   });
 };

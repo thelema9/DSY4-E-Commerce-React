@@ -1,0 +1,45 @@
+# Configuración de HuertoHogar API.
+# Todos los valores sensibles vienen de variables de entorno (ver .env.example). Nada de credenciales en el repo.
+
+server:
+  port: ${PORT:8080}
+  # Detrás de nginx: respeta X-Forwarded-* (host, protocolo) al armar URLs.
+  forward-headers-strategy: framework
+
+spring:
+  application:
+    name: huertohogar-api
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:huertohogar}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=America/Santiago&characterEncoding=UTF-8
+    username: ${DB_USER:huerto_app}
+    password: ${DB_PASSWORD:}
+  jpa:
+    hibernate:
+      # update: crea/ajusta tablas si faltan. En la EC2 las tablas ya las crea db/schema.sql.
+      ddl-auto: ${JPA_DDL_AUTO:update}
+    open-in-view: false
+  jackson:
+    time-zone: America/Santiago
+
+app:
+  jwt:
+    secret: ${JWT_SECRET}               # obligatorio, mínimo 32 bytes. Generar con: openssl rand -base64 48
+    expiration-ms: ${JWT_EXPIRATION_MS:3600000}
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
+  admin:
+    email: ${ADMIN_EMAIL:admin@huertohogar.cl}
+    password: ${ADMIN_PASSWORD}         # obligatorio
+  cliente-demo:
+    email: ${CLIENTE_DEMO_EMAIL:cliente@huertohogar.cl}
+    password: ${CLIENTE_DEMO_PASSWORD:} # si queda vacío, no se crea el cliente demo
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html

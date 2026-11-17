@@ -4,18 +4,19 @@ import { useAuth } from "../context/AuthContext";
 import { esEmailValido } from "../utils/validaciones";
 
 export default function LoginPage() {
-  const { iniciarSesion, sesion } = useAuth();
+  const { iniciarSesion, usuario } = useAuth();
   const navigate = useNavigate();
   // Si llegó redirigido desde una ruta protegida, vuelve a ella tras el login.
   const destino = useLocation().state?.desde || "/";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [errores, setErrores] = useState({});
+  const [enviando, setEnviando] = useState(false);
 
-  if (sesion) {
+  if (usuario) {
     return (
       <div className="container py-5 text-center">
-        <div className="alert alert-success">Ya tienes sesión iniciada como {sesion.email}.</div>
+        <div className="alert alert-success">Ya tienes sesión iniciada como {usuario.email}.</div>
         <Link to="/" className="btn btn-success">
           Volver al inicio
         </Link>
@@ -23,28 +24,25 @@ export default function LoginPage() {
     );
   }
 
-  function manejarSubmit(evento) {
+  async function manejarSubmit(evento) {
     evento.preventDefault();
     const nuevos = {};
 
-    if (!esEmailValido(email)) {
-      nuevos.email = "Ingresa un correo con formato válido.";
-    }
-    if (!password) {
-      nuevos.password = "La contraseña es obligatoria.";
-    }
-
-    if (Object.keys(nuevos).length === 0) {
-      const errorLogin = iniciarSesion(email, password);
-      if (errorLogin) {
-        nuevos.email = errorLogin;
-      } else {
-        navigate(destino, { replace: true });
-        return;
-      }
-    }
+    if (!esEmailValido(email)) nuevos.email = "Ingresa un correo con formato válido.";
+    if (!password) nuevos.password = "La contraseña es obligatoria.";
 
     setErrores(nuevos);
+    if (Object.keys(nuevos).length > 0) return;
+
+    setEnviando(true);
+    try {
+      await iniciarSesion(email, password);
+      navigate(destino, { replace: true });
+    } catch (error) {
+      // 401: credenciales incorrectas · 403: cuenta desactivada · 0: sin conexión con la API.
+      setErrores({ general: error.message });
+      setEnviando(false);
+    }
   }
 
   return (
@@ -65,6 +63,11 @@ export default function LoginPage() {
           <div className="card">
             <div className="card-header bg-success text-white">Inicio de sesión</div>
             <div className="card-body">
+              {errores.general && (
+                <div className="alert alert-danger py-2" role="alert">
+                  {errores.general}
+                </div>
+              )}
               <form onSubmit={manejarSubmit} noValidate>
                 <div className="mb-3">
                   <label htmlFor="email" className="form-label">
@@ -94,8 +97,8 @@ export default function LoginPage() {
                   />
                   {errores.password && <div className="text-danger small">{errores.password}</div>}
                 </div>
-                <button type="submit" className="btn btn-success w-100">
-                  Iniciar sesión
+                <button type="submit" className="btn btn-success w-100" disabled={enviando}>
+                  {enviando ? "Ingresando..." : "Iniciar sesión"}
                 </button>
               </form>
               <p className="small mt-3 mb-0 text-center">

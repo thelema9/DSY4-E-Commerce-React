@@ -1,8 +1,7 @@
 // Helpers mínimos de localStorage.
-export const CLAVE_USUARIOS = "huertohogar_usuarios";
+// Solo se guardan la sesión (token JWT + usuario) y el carrito: el resto viene de la API.
 export const CLAVE_SESION = "huertohogar_sesion";
 export const CLAVE_CARRITO = "huertohogar_carrito";
-export const CLAVE_PRODUCTOS = "huertohogar_productos";
 
 export function leerClave(clave, valorPorDefecto) {
   try {

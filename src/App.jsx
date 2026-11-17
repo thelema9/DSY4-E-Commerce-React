@@ -4,14 +4,13 @@ import Header from "./components/Header";
 import RutaProtegida from "./components/RutaProtegida";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { CarritoProvider, useCarrito } from "./context/CarritoContext";
-import { ProductosProvider } from "./context/ProductosContext";
+import { ProductosProvider, useProductos } from "./context/ProductosContext";
 import AdminPage from "./pages/AdminPage";
+import AdminUsuariosPage from "./pages/AdminUsuariosPage";
 import CarritoPage from "./pages/CarritoPage";
 import HomePage from "./pages/HomePage";
 import LoginPage from "./pages/LoginPage";
 import RegistroPage from "./pages/RegistroPage";
-
-const CATEGORIAS_FOOTER = ["Frutas Frescas", "Verduras Orgánicas", "Productos Orgánicos"];
 
 // Providers globales de la app (exportados para reutilizarlos en las pruebas).
 export function Proveedores({ children }) {
@@ -27,12 +26,15 @@ export function Proveedores({ children }) {
 // Layout fuera de los providers porque necesita leer sus hooks.
 // Exportado para que las pruebas lo monten con un MemoryRouter.
 export function Layout() {
-  const { sesion, cerrarSesion } = useAuth();
+  const { usuario, cerrarSesion } = useAuth();
   const { totalUnidades } = useCarrito();
+  const { productos } = useProductos();
+  // Las categorías del footer salen del catálogo que entrega la API (sin datos quemados).
+  const categorias = [...new Set(productos.map((p) => p.categoria))];
 
   return (
     <>
-      <Header totalUnidades={totalUnidades} usuario={sesion} onCerrarSesion={cerrarSesion} />
+      <Header totalUnidades={totalUnidades} usuario={usuario} onCerrarSesion={cerrarSesion} />
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/login" element={<LoginPage />} />
@@ -46,9 +48,17 @@ export function Layout() {
             </RutaProtegida>
           }
         />
+        <Route
+          path="/admin/usuarios"
+          element={
+            <RutaProtegida>
+              <AdminUsuariosPage />
+            </RutaProtegida>
+          }
+        />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-      <Footer categorias={CATEGORIAS_FOOTER} />
+      <Footer categorias={categorias} />
     </>
   );
 }

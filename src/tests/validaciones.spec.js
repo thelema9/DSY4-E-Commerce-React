@@ -5,6 +5,7 @@ import {
   esTelefonoValido,
   validarProducto,
   validarRegistro,
+  validarUsuario,
 } from "../utils/validaciones";
 
 describe("Validaciones: esEmailValido", () => {
@@ -127,19 +128,71 @@ describe("Validaciones: validarRegistro", () => {
 });
 
 describe("Validaciones: validarProducto", () => {
+  const valido = {
+    codigo: "FR009",
+    nombre: "Palta Hass",
+    categoria: "Frutas Frescas",
+    precio: "2000",
+    stock: "15",
+    unidad: "kilo",
+  };
+
   it("devuelve vacío con un producto válido", () => {
-    const producto = { nombre: "Palta Hass", categoria: "Frutas Frescas", precio: 2000, unidad: "kilo" };
-    expect(validarProducto(producto)).toEqual({});
+    expect(validarProducto(valido)).toEqual({});
   });
 
-  it("exige nombre, categoría, precio y unidad", () => {
-    const errores = validarProducto({ nombre: "", categoria: "", precio: "", unidad: "" });
-    expect(Object.keys(errores).sort()).toEqual(["categoria", "nombre", "precio", "unidad"]);
+  it("exige código, nombre, categoría, precio, stock y unidad", () => {
+    const vacio = { codigo: "", nombre: "", categoria: "", precio: "", stock: "", unidad: "" };
+    expect(Object.keys(validarProducto(vacio)).sort()).toEqual(
+      ["categoria", "codigo", "nombre", "precio", "stock", "unidad"]
+    );
   });
 
-  it("rechaza precios cero o negativos", () => {
-    const base = { nombre: "A", categoria: "B", unidad: "kilo" };
-    expect(validarProducto({ ...base, precio: 0 }).precio).toBeDefined();
-    expect(validarProducto({ ...base, precio: -5 }).precio).toBeDefined();
+  it("rechaza precios cero, negativos o con decimales", () => {
+    expect(validarProducto({ ...valido, precio: 0 }).precio).toBeDefined();
+    expect(validarProducto({ ...valido, precio: -5 }).precio).toBeDefined();
+    expect(validarProducto({ ...valido, precio: "10.5" }).precio).toBeDefined();
+  });
+
+  it("acepta stock 0 pero rechaza stock negativo o con decimales", () => {
+    expect(validarProducto({ ...valido, stock: "0" }).stock).toBeUndefined();
+    expect(validarProducto({ ...valido, stock: "-1" }).stock).toBeDefined();
+    expect(validarProducto({ ...valido, stock: "2.5" }).stock).toBeDefined();
+  });
+
+  it("rechaza códigos de más de 10 caracteres", () => {
+    expect(validarProducto({ ...valido, codigo: "ABCDEFGHIJK" }).codigo).toContain("10 caracteres");
+  });
+});
+
+describe("Validaciones: validarUsuario (CRUD de administrador)", () => {
+  const valido = {
+    nombre: "Pedro Soto",
+    email: "pedro@correo.com",
+    password: "Clave123!",
+    telefono: "",
+    region: "Región de Valparaíso",
+    comuna: "Viña del Mar",
+    rol: "CLIENTE",
+  };
+
+  it("devuelve vacío con un usuario válido", () => {
+    expect(validarUsuario(valido)).toEqual({});
+  });
+
+  it("al crear, la contraseña es obligatoria", () => {
+    expect(validarUsuario({ ...valido, password: "" }).password).toBeDefined();
+  });
+
+  it("al editar, una contraseña vacía significa no cambiarla", () => {
+    expect(validarUsuario({ ...valido, password: "" }, { esEdicion: true })).toEqual({});
+  });
+
+  it("al editar, una contraseña nueva igual debe ser segura", () => {
+    expect(validarUsuario({ ...valido, password: "debil" }, { esEdicion: true }).password).toBeDefined();
+  });
+
+  it("exige un rol", () => {
+    expect(validarUsuario({ ...valido, rol: "" }).rol).toBe("Selecciona un rol.");
   });
 });

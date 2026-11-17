@@ -1,0 +1,183 @@
+# CI/CD del BACKEND (carpeta backend/): pruebas (JUnit + MockMvc) → imagen Docker en GHCR → EC2 de backend.
+# Solo se ejecuta cuando cambia algo dentro de backend/ (o este workflow).
+#
+# GitHub → Settings → Secrets and variables → Actions (secrets y variables del repositorio):
+#   Secrets:   BACK_EC2_HOST, BACK_EC2_SSH_KEY, EC2_USER,
+#              DB_PASSWORD, JWT_SECRET, ADMIN_PASSWORD, CLIENTE_DEMO_PASSWORD
+#   Variables: DB_PRIVATE_IP (IP privada de la EC2 de base de datos), DB_NAME, DB_USER,
+#              CORS_ALLOWED_ORIGINS (URL del frontend), JWT_EXPIRATION_MS, ADMIN_EMAIL, CLIENTE_DEMO_EMAIL
+name: Backend CI/CD
+
+on:
+  push:
+    # preparacion_backend: rama para probar el despliegue antes de llevarlo a main
+    branches: [main, preparacion_backend]
+    paths: ["backend/**", "scripts/**", ".github/workflows/backend.yml"]
+  pull_request:
+    branches: [main]
+    paths: ["backend/**", "scripts/**", ".github/workflows/backend.yml"]
+  workflow_dispatch:
+
+concurrency:
+  group: backend-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DIR_REMOTO: /opt/huertohogar/backend
+
+jobs:
+  test:
+    name: Pruebas
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+          cache-dependency-path: backend/pom.xml
+
+      - run: chmod +x mvnw && ./mvnw -B verify
+
+      - name: Publicar resultados de las pruebas
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reportes-pruebas-backend
+          path: backend/target/surefire-reports/
+
+  imagen:
+    name: Imagen Docker (GHCR)
+    needs: test
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      imagen: ${{ steps.nombre.outputs.imagen }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # GHCR exige el nombre en minúsculas (el usuario de GitHub puede tener mayúsculas).
+      - id: nombre
+        run: echo "imagen=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/huertohogar-api" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: backend
+          push: true
+          tags: |
+            ${{ steps.nombre.outputs.imagen }}:latest
+            ${{ steps.nombre.outputs.imagen }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    name: Despliegue en EC2 de backend
+    needs: imagen
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Instala Docker + Compose y crea /opt/huertohogar si la EC2 es nueva (no hace nada si ya está lista).
+      - name: Copiar script de preparación de la EC2
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.BACK_EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.BACK_EC2_SSH_KEY }}
+          source: "scripts/preparar-ec2.sh"
+          target: /tmp/huertohogar
+          strip_components: 1
+
+      - name: Preparar la EC2 (Docker, carpeta, swap)
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.BACK_EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.BACK_EC2_SSH_KEY }}
+          command_timeout: 15m
+          script: |
+            bash /tmp/huertohogar/preparar-ec2.sh
+            mkdir -p ${{ env.DIR_REMOTO }}
+
+      - name: Copiar docker-compose.yml
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.BACK_EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.BACK_EC2_SSH_KEY }}
+          source: "backend/docker-compose.yml"
+          target: ${{ env.DIR_REMOTO }}
+          strip_components: 1
+
+      - name: Escribir .env y levantar la API
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          API_IMAGE: ${{ needs.imagen.outputs.imagen }}:${{ github.sha }}
+          GHCR_USER: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DB_HOST: ${{ vars.DB_PRIVATE_IP }}
+          DB_NAME: ${{ vars.DB_NAME }}
+          DB_USER: ${{ vars.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          JWT_EXPIRATION_MS: ${{ vars.JWT_EXPIRATION_MS }}
+          CORS_ALLOWED_ORIGINS: ${{ vars.CORS_ALLOWED_ORIGINS }}
+          ADMIN_EMAIL: ${{ vars.ADMIN_EMAIL }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          CLIENTE_DEMO_EMAIL: ${{ vars.CLIENTE_DEMO_EMAIL }}
+          CLIENTE_DEMO_PASSWORD: ${{ secrets.CLIENTE_DEMO_PASSWORD }}
+        with:
+          host: ${{ secrets.BACK_EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.BACK_EC2_SSH_KEY }}
+          # Los secretos llegan como variables de entorno (envs), no interpolados en el script.
+          envs: API_IMAGE,GHCR_USER,GHCR_TOKEN,DB_HOST,DB_NAME,DB_USER,DB_PASSWORD,JWT_SECRET,JWT_EXPIRATION_MS,CORS_ALLOWED_ORIGINS,ADMIN_EMAIL,ADMIN_PASSWORD,CLIENTE_DEMO_EMAIL,CLIENTE_DEMO_PASSWORD
+          script: |
+            set -e
+            cd ${{ env.DIR_REMOTO }}
+            umask 077
+            # Comillas simples: docker compose no interpreta los '$' de las contraseñas.
+            cat > .env <<EOF
+            API_IMAGE='$API_IMAGE'
+            DB_HOST='$DB_HOST'
+            DB_NAME='$DB_NAME'
+            DB_USER='$DB_USER'
+            DB_PASSWORD='$DB_PASSWORD'
+            JWT_SECRET='$JWT_SECRET'
+            JWT_EXPIRATION_MS='$JWT_EXPIRATION_MS'
+            CORS_ALLOWED_ORIGINS='$CORS_ALLOWED_ORIGINS'
+            ADMIN_EMAIL='$ADMIN_EMAIL'
+            ADMIN_PASSWORD='$ADMIN_PASSWORD'
+            CLIENTE_DEMO_EMAIL='$CLIENTE_DEMO_EMAIL'
+            CLIENTE_DEMO_PASSWORD='$CLIENTE_DEMO_PASSWORD'
+            EOF
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+            docker compose pull api
+            docker compose up -d --no-build --remove-orphans
+            docker logout ghcr.io
+            docker image prune -f
+            # Espera a que la API responda (si MySQL no es alcanzable, aquí se ve el error en los logs).
+            for i in $(seq 1 30); do
+              if curl -fsS http://127.0.0.1:8080/actuator/health >/dev/null; then
+                echo "API desplegada y saludable"; exit 0
+              fi
+              sleep 5
+            done
+            echo "La API no respondió a tiempo. ¿La EC2 de BD está arriba y su security group permite 3306 desde esta EC2?"
+            docker compose logs --tail=80 api; exit 1
