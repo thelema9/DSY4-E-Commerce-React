@@ -1,0 +1,19 @@
+# Compilación
+target/
+!.mvn/wrapper/maven-wrapper.jar
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.settings/
+.project
+.classpath
+.factorypath
+.DS_Store
+
+# Variables de entorno y credenciales: NUNCA al repositorio (se usan secrets de GitHub)
+.env
+.env.*
+!.env.example
+*.pem

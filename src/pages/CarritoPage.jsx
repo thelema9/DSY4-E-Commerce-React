@@ -1,33 +1,41 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { Cargando, MensajeError } from "../components/EstadoCarga";
 import { useCarrito } from "../context/CarritoContext";
 import { useProductos } from "../context/ProductosContext";
-import { CUPONES } from "../data/productos";
+import * as cuponesService from "../services/cuponesService";
 
 export default function CarritoPage() {
   const { items, actualizarCantidad, vaciarCarrito } = useCarrito();
-  const { buscarProducto } = useProductos();
+  const { buscarProducto, cargando, error, cargarProductos } = useProductos();
   const [cupon, setCupon] = useState("");
   const [mensajeCupon, setMensajeCupon] = useState(null); // { texto, tipo }
-  const [descuento, setDescuento] = useState(0);
+  const [porcentaje, setPorcentaje] = useState(0); // descuento del cupón aplicado (0.1 = 10%)
+  const [validandoCupon, setValidandoCupon] = useState(false);
   const [mensajePago, setMensajePago] = useState(null);
 
+  // Los precios salen del catálogo de la API, no de lo guardado en el carrito.
   const subtotal = items.reduce((total, item) => {
     const producto = buscarProducto(item.codigo);
     return total + (producto ? producto.precio * item.cantidad : 0);
   }, 0);
 
+  const descuento = Math.round(subtotal * porcentaje);
   const total = Math.max(subtotal - descuento, 0);
 
-  function aplicarCupon() {
+  async function aplicarCupon() {
     const codigo = cupon.trim().toUpperCase();
-    const porcentaje = CUPONES[codigo];
-    if (!porcentaje) {
-      setDescuento(0);
-      setMensajeCupon({ texto: "Cupón inválido.", tipo: "danger" });
-    } else {
-      setDescuento(subtotal * porcentaje);
-      setMensajeCupon({ texto: `Cupón aplicado: -${porcentaje * 100}%`, tipo: "success" });
+    if (!codigo) return;
+    setValidandoCupon(true);
+    try {
+      const datos = await cuponesService.validar(codigo);
+      setPorcentaje(datos.porcentaje);
+      setMensajeCupon({ texto: `Cupón aplicado: -${Math.round(datos.porcentaje * 100)}%`, tipo: "success" });
+    } catch (e) {
+      setPorcentaje(0);
+      setMensajeCupon({ texto: e.status === 404 ? "Cupón inválido." : e.message, tipo: "danger" });
+    } finally {
+      setValidandoCupon(false);
     }
   }
 
@@ -37,7 +45,7 @@ export default function CarritoPage() {
       return;
     }
     vaciarCarrito();
-    setDescuento(0);
+    setPorcentaje(0);
     setCupon("");
     setMensajeCupon(null);
     setMensajePago({ texto: "¡Pedido confirmado! (pago simulado, sin pasarela real)", tipo: "success" });
@@ -46,6 +54,8 @@ export default function CarritoPage() {
   return (
     <main className="container py-5">
       <h1 className="mb-4">Mi carrito de compras</h1>
+      {cargando && items.length > 0 && <Cargando texto="Cargando precios..." />}
+      {error && <MensajeError mensaje={error} onReintentar={cargarProductos} />}
       <div className="row g-4">
         <div className="col-md-8">
           {items.length === 0 ? (
@@ -122,7 +132,12 @@ export default function CarritoPage() {
                     value={cupon}
                     onChange={(e) => setCupon(e.target.value)}
                   />
-                  <button className="btn btn-outline-success" type="button" onClick={aplicarCupon}>
+                  <button
+                    className="btn btn-outline-success"
+                    type="button"
+                    onClick={aplicarCupon}
+                    disabled={validandoCupon}
+                  >
                     Aplicar
                   </button>
                 </div>

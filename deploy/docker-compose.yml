@@ -1,0 +1,14 @@
+# EC2 de FRONTEND: nginx sirviendo el build de React.
+# Se copia a /opt/huertohogar/frontend junto a nginx.conf y la carpeta dist/ (lo hace el workflow frontend.yml).
+name: huertohogar-frontend
+
+services:
+  web:
+    image: nginx:1.27-alpine
+    container_name: huertohogar-web
+    restart: unless-stopped
+    ports:
+      - "80:80"   # URL pública del frontend: http://<IP-front>/
+    volumes:
+      - ./dist:/usr/share/nginx/html:ro
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro

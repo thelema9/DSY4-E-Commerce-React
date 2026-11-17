@@ -1,32 +1,47 @@
-import { createContext, useContext, useEffect, useState } from "react";
-import { PRODUCTOS_INICIALES } from "../data/productos";
-import { CLAVE_PRODUCTOS, guardarClave, leerClave } from "../utils/storage";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import * as productosService from "../services/productosService";
 
 const ProductosContext = createContext(null);
 
+// Catálogo compartido: se carga desde la API y cada operación del CRUD pasa por el backend.
 export function ProductosProvider({ children }) {
-  const [productos, setProductos] = useState(() =>
-    leerClave(CLAVE_PRODUCTOS, PRODUCTOS_INICIALES)
-  );
+  const [productos, setProductos] = useState([]);
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState(null);
+
+  const cargarProductos = useCallback(async () => {
+    setCargando(true);
+    setError(null);
+    try {
+      setProductos(await productosService.listar());
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setCargando(false);
+    }
+  }, []);
 
   useEffect(() => {
-    guardarClave(CLAVE_PRODUCTOS, productos);
-  }, [productos]);
+    cargarProductos();
+  }, [cargarProductos]);
 
-  // CREATE: agrega un producto nuevo (el código debe ser único).
-  function agregarProducto(producto) {
-    setProductos((prev) => [...prev, producto]);
+  // CREATE: el backend valida y responde 201 con el producto creado (o 400/403/409).
+  async function agregarProducto(producto) {
+    const creado = await productosService.crear(producto);
+    setProductos((prev) => [...prev, creado]);
+    return creado;
   }
 
-  // UPDATE: reemplaza el producto que tenga el mismo código.
-  function actualizarProducto(productoActualizado) {
-    setProductos((prev) =>
-      prev.map((p) => (p.codigo === productoActualizado.codigo ? productoActualizado : p))
-    );
+  // UPDATE: reemplaza el producto con la versión que devuelve el backend.
+  async function actualizarProducto(producto) {
+    const actualizado = await productosService.actualizar(producto.codigo, producto);
+    setProductos((prev) => prev.map((p) => (p.codigo === actualizado.codigo ? actualizado : p)));
+    return actualizado;
   }
 
-  // DELETE: elimina por código.
-  function eliminarProducto(codigo) {
+  // DELETE: solo se quita de la lista si el backend confirmó (204).
+  async function eliminarProducto(codigo) {
+    await productosService.eliminar(codigo);
     setProductos((prev) => prev.filter((p) => p.codigo !== codigo));
   }
 
@@ -36,7 +51,16 @@ export function ProductosProvider({ children }) {
 
   return (
     <ProductosContext.Provider
-      value={{ productos, agregarProducto, actualizarProducto, eliminarProducto, buscarProducto }}
+      value={{
+        productos,
+        cargando,
+        error,
+        cargarProductos,
+        agregarProducto,
+        actualizarProducto,
+        eliminarProducto,
+        buscarProducto,
+      }}
     >
       {children}
     </ProductosContext.Provider>

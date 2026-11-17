@@ -1,0 +1,29 @@
+# EC2 de BACKEND: API Spring Boot (la base de datos está en otra EC2).
+# En la EC2 vive en /opt/huertohogar/backend junto a un .env que escribe GitHub Actions (workflow backend.yml).
+# En local: cd backend && cp .env.example .env (completar, DB_HOST=host.docker.internal) && docker compose up -d --build
+name: huertohogar-backend
+
+services:
+  api:
+    image: ${API_IMAGE:-huertohogar-api:local}
+    build: .
+    container_name: huertohogar-api
+    restart: unless-stopped   # si MySQL aún no responde, el contenedor reintenta solo
+    environment:
+      DB_HOST: ${DB_HOST}     # IP PRIVADA de la EC2 de base de datos
+      DB_PORT: ${DB_PORT:-3306}
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRATION_MS: ${JWT_EXPIRATION_MS:-3600000}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}   # URL pública del frontend
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@huertohogar.cl}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      CLIENTE_DEMO_EMAIL: ${CLIENTE_DEMO_EMAIL:-cliente@huertohogar.cl}
+      CLIENTE_DEMO_PASSWORD: ${CLIENTE_DEMO_PASSWORD:-}
+    ports:
+      - "8080:8080"           # URL pública del backend: http://<IP-back>:8080/api
+    extra_hosts:
+      # Solo para desarrollo local con Docker Desktop: permite DB_HOST=host.docker.internal.
+      - "host.docker.internal:host-gateway"

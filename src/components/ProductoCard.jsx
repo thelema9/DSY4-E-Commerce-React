@@ -1,5 +1,7 @@
 // Tarjeta de producto: recibe el producto y el callback de agregar por props.
 export default function ProductoCard({ producto, onAgregar }) {
+  const sinStock = producto.stock === 0;
+
   return (
     <div className="col-6 col-md-4 col-lg-3">
       <article className="card h-100">
@@ -10,8 +12,12 @@ export default function ProductoCard({ producto, onAgregar }) {
           <p className="fw-bold mb-2">
             ${producto.precio.toLocaleString("es-CL")} / {producto.unidad}
           </p>
-          <button className="btn btn-success btn-sm mt-auto" onClick={() => onAgregar(producto.codigo)}>
-            Agregar al carrito
+          <button
+            className="btn btn-success btn-sm mt-auto"
+            onClick={() => onAgregar(producto.codigo)}
+            disabled={sinStock}
+          >
+            {sinStock ? "Sin stock" : "Agregar al carrito"}
           </button>
         </div>
       </article>

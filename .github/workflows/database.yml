@@ -1,0 +1,124 @@
+# CI/CD de la BASE DE DATOS (carpeta database/): valida los scripts SQL → EC2 de base de datos (MySQL en Docker).
+# Solo se ejecuta cuando cambia algo dentro de database/ (o este workflow).
+#
+# Importante: schema.sql y seed.sql se aplican solo la PRIMERA vez (volumen vacío).
+# Volver a desplegar no borra ni reemplaza los datos existentes.
+#
+# GitHub → Settings → Secrets and variables → Actions (secrets y variables del repositorio):
+#   Secrets:   DB_EC2_HOST, DB_EC2_SSH_KEY, EC2_USER, DB_PASSWORD, DB_ROOT_PASSWORD
+#   Variables: DB_NAME, DB_USER
+name: Database CI/CD
+
+on:
+  push:
+    # preparacion_backend: rama para probar el despliegue antes de llevarlo a main
+    branches: [main, preparacion_backend]
+    paths: ["database/**", "scripts/**", ".github/workflows/database.yml"]
+  pull_request:
+    branches: [main]
+    paths: ["database/**", "scripts/**", ".github/workflows/database.yml"]
+  workflow_dispatch:
+
+concurrency:
+  group: database-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DIR_REMOTO: /opt/huertohogar/database
+
+jobs:
+  validar:
+    name: Validar schema.sql y seed.sql en MySQL 8
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: ci-root
+          MYSQL_DATABASE: huertohogar
+        ports: ["3306:3306"]
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -pci-root"
+          --health-interval=5s --health-timeout=5s --health-retries=30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Ejecutar los scripts y revisar los datos
+        env:
+          MYSQL_PWD: ci-root
+        run: |
+          mysql -h 127.0.0.1 -u root huertohogar < database/schema.sql
+          mysql -h 127.0.0.1 -u root huertohogar < database/seed.sql
+          mysql -h 127.0.0.1 -u root huertohogar < database/seed.sql   # idempotente: no debe duplicar
+          productos=$(mysql -h 127.0.0.1 -u root -N huertohogar -e "SELECT COUNT(*) FROM productos")
+          echo "Productos cargados: $productos"
+          test "$productos" -eq 8
+
+  deploy:
+    name: Despliegue en EC2 de base de datos
+    needs: validar
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Instala Docker + Compose y crea /opt/huertohogar si la EC2 es nueva (no hace nada si ya está lista).
+      - name: Copiar script de preparación de la EC2
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DB_EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.DB_EC2_SSH_KEY }}
+          source: "scripts/preparar-ec2.sh"
+          target: /tmp/huertohogar
+          strip_components: 1
+
+      - name: Preparar la EC2 (Docker, carpeta, swap)
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.DB_EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.DB_EC2_SSH_KEY }}
+          command_timeout: 15m
+          script: |
+            bash /tmp/huertohogar/preparar-ec2.sh
+            mkdir -p ${{ env.DIR_REMOTO }}
+
+      - name: Copiar docker-compose.yml, scripts SQL y respaldo
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DB_EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.DB_EC2_SSH_KEY }}
+          source: "database/docker-compose.yml,database/schema.sql,database/seed.sql,database/backup.sh"
+          target: ${{ env.DIR_REMOTO }}
+          strip_components: 1
+
+      - name: Escribir .env y levantar MySQL
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          DB_NAME: ${{ vars.DB_NAME }}
+          DB_USER: ${{ vars.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_ROOT_PASSWORD: ${{ secrets.DB_ROOT_PASSWORD }}
+        with:
+          host: ${{ secrets.DB_EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.DB_EC2_SSH_KEY }}
+          envs: DB_NAME,DB_USER,DB_PASSWORD,DB_ROOT_PASSWORD
+          command_timeout: 15m   # el primer arranque de MySQL (crear la base) puede tardar varios minutos
+          script: |
+            set -e
+            cd ${{ env.DIR_REMOTO }}
+            chmod +x backup.sh
+            umask 077
+            # Comillas simples: docker compose no interpreta los '$' de las contraseñas.
+            cat > .env <<EOF
+            DB_NAME='$DB_NAME'
+            DB_USER='$DB_USER'
+            DB_PASSWORD='$DB_PASSWORD'
+            DB_ROOT_PASSWORD='$DB_ROOT_PASSWORD'
+            EOF
+            # --wait: espera a que el healthcheck de MySQL quede "healthy".
+            docker compose up -d --wait --wait-timeout 840
+            echo "MySQL desplegado y saludable"

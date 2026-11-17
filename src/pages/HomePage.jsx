@@ -1,11 +1,12 @@
 import { useEffect } from "react";
 import { useLocation } from "react-router-dom";
+import { Cargando, MensajeError } from "../components/EstadoCarga";
 import ProductoCard from "../components/ProductoCard";
 import { useCarrito } from "../context/CarritoContext";
 import { useProductos } from "../context/ProductosContext";
 
 export default function HomePage() {
-  const { productos } = useProductos();
+  const { productos, cargando, error, cargarProductos } = useProductos();
   const { agregarAlCarrito } = useCarrito();
   const { hash, key } = useLocation();
 
@@ -40,6 +41,11 @@ export default function HomePage() {
       <section id="catalogo" className="py-5 bg-light">
         <div className="container">
           <h2 className="text-center mb-4">Nuestros productos</h2>
+          {cargando && <Cargando texto="Cargando productos..." />}
+          {error && <MensajeError mensaje={error} onReintentar={cargarProductos} />}
+          {!cargando && !error && productos.length === 0 && (
+            <p className="text-center text-muted">No hay productos disponibles por ahora.</p>
+          )}
           <div className="row g-4">
             {productos.map((producto) => (
               <ProductoCard

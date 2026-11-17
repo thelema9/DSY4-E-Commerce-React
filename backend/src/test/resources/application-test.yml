@@ -1,0 +1,24 @@
+# Perfil de pruebas: H2 en memoria (modo MySQL), sin depender de un servidor de base de datos.
+# Los valores de aquí son solo para las pruebas automatizadas.
+spring:
+  datasource:
+    url: jdbc:h2:mem:huertohogar;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+
+app:
+  jwt:
+    secret: dGVzdC1zb2xvLXBhcmEtcHJ1ZWJhcy1hdXRvbWF0aXphZGFzLWh1ZXJ0b2hvZ2FyLTEyMzQ=
+    expiration-ms: 3600000
+  cors:
+    allowed-origins: http://localhost:5173
+  admin:
+    email: admin@huertohogar.cl
+    password: Admin123!
+  cliente-demo:
+    email: cliente@huertohogar.cl
+    password: Cliente123!

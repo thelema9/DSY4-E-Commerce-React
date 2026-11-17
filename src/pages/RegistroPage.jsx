@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { REGIONES } from "../data/productos";
+import { REGIONES } from "../data/regiones";
 import { validarRegistro } from "../utils/validaciones";
 
 const FORM_VACIO = {
@@ -16,10 +16,11 @@ const FORM_VACIO = {
 };
 
 export default function RegistroPage() {
-  const { registrarUsuario, existeUsuario } = useAuth();
+  const { registrarUsuario } = useAuth();
   const [form, setForm] = useState(FORM_VACIO);
   const [errores, setErrores] = useState({});
   const [creado, setCreado] = useState(false);
+  const [enviando, setEnviando] = useState(false);
 
   const comunas = REGIONES[form.region] || [];
 
@@ -27,32 +28,36 @@ export default function RegistroPage() {
     setForm((prev) => ({ ...prev, [campo]: valor }));
   }
 
-  function manejarSubmit(evento) {
+  async function manejarSubmit(evento) {
     evento.preventDefault();
 
     const datos = { ...form, email: form.email.trim().toLowerCase(), confirmarEmail: form.confirmarEmail.trim().toLowerCase() };
     const nuevos = validarRegistro(datos);
+    setErrores(nuevos);
+    if (Object.keys(nuevos).length > 0) return;
 
-    if (!nuevos.email && existeUsuario(datos.email)) {
-      nuevos.email = "Ya existe una cuenta con este correo.";
+    setEnviando(true);
+    try {
+      // Las confirmaciones solo se validan en el front: al backend va el usuario a crear.
+      await registrarUsuario({
+        nombre: datos.nombre.trim(),
+        email: datos.email,
+        password: datos.password,
+        telefono: datos.telefono.trim() || null,
+        region: datos.region,
+        comuna: datos.comuna,
+      });
+      setCreado(true);
+      setForm(FORM_VACIO);
+    } catch (error) {
+      if (error.status === 409) {
+        setErrores({ email: error.message }); // correo ya registrado
+      } else {
+        setErrores({ ...error.errores, general: error.message }); // 400 con errores por campo, o fallo de red
+      }
+    } finally {
+      setEnviando(false);
     }
-
-    if (Object.keys(nuevos).length > 0) {
-      setErrores(nuevos);
-      return;
-    }
-
-    registrarUsuario({
-      nombre: datos.nombre.trim(),
-      email: datos.email,
-      password: datos.password,
-      telefono: datos.telefono || null,
-      region: datos.region,
-      comuna: datos.comuna,
-    });
-    setErrores({});
-    setCreado(true);
-    setForm(FORM_VACIO);
   }
 
   if (creado) {
@@ -74,6 +79,11 @@ export default function RegistroPage() {
       <div className="row justify-content-center">
         <div className="col-md-6">
           <h1 className="text-center mb-4">Registro de usuario</h1>
+          {errores.general && (
+            <div className="alert alert-danger" role="alert">
+              {errores.general}
+            </div>
+          )}
 
           <form onSubmit={manejarSubmit} noValidate>
             <div className="mb-3">
@@ -191,7 +201,9 @@ export default function RegistroPage() {
               {errores.comuna && <div className="text-danger small">{errores.comuna}</div>}
             </div>
 
-            <button type="submit" className="btn btn-success w-100">Registrarme</button>
+            <button type="submit" className="btn btn-success w-100" disabled={enviando}>
+              {enviando ? "Registrando..." : "Registrarme"}
+            </button>
           </form>
         </div>
       </div>

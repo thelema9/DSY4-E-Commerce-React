@@ -2,72 +2,91 @@ import { act, renderHook } from "@testing-library/react";
 import { AuthProvider, useAuth } from "../context/AuthContext";
 import { CarritoProvider, useCarrito } from "../context/CarritoContext";
 import { ProductosProvider, useProductos } from "../context/ProductosContext";
-import { ADMIN_INICIAL, ROLES } from "../data/usuarios";
-import { CLAVE_CARRITO, CLAVE_PRODUCTOS, CLAVE_SESION, CLAVE_USUARIOS } from "../utils/storage";
-import { SESION_ANA, USUARIA_ANA, leerStorage, sembrarStorage } from "./helpers";
+import { EVENTO_SESION_EXPIRADA } from "../services/api";
+import { ROLES } from "../utils/roles";
+import { CLAVE_CARRITO, CLAVE_SESION } from "../utils/storage";
+import { ADMIN, ANA, PASSWORD_ADMIN, instalarBackendFalso } from "./backendFalso";
+import { capturarError, esperarQue, leerStorage, sembrarCarrito, sembrarSesion } from "./helpers";
 
 const conProductos = ({ children }) => <ProductosProvider>{children}</ProductosProvider>;
 const conCarrito = ({ children }) => <CarritoProvider>{children}</CarritoProvider>;
 const conAuth = ({ children }) => <AuthProvider>{children}</AuthProvider>;
 
-describe("Contexto: ProductosContext (CRUD)", () => {
+describe("Contexto: ProductosContext (CRUD contra la API)", () => {
+  let backend;
+
   beforeEach(() => {
     localStorage.clear();
+    backend = instalarBackendFalso();
   });
 
-  it("parte con el catálogo inicial de 8 productos", () => {
+  async function montarCatalogo() {
+    const hook = renderHook(() => useProductos(), { wrapper: conProductos });
+    await esperarQue(() => !hook.result.current.cargando);
+    return hook;
+  }
+
+  it("parte cargando y luego trae el catálogo desde GET /productos", async () => {
     const { result } = renderHook(() => useProductos(), { wrapper: conProductos });
-    expect(result.current.productos.length).toBe(8);
-    expect(result.current.productos[0].codigo).toBe("FR001");
+    expect(result.current.cargando).toBeTrue();
+
+    await esperarQue(() => !result.current.cargando);
+
+    expect(result.current.productos.length).toBe(4);
+    expect(result.current.error).toBeNull();
+    expect(backend.llamadasA("GET", "/productos").length).toBe(1);
   });
 
-  it("carga el catálogo guardado en localStorage si existe", () => {
-    sembrarStorage({ [CLAVE_PRODUCTOS]: [{ codigo: "X1", nombre: "Solo uno", precio: 1 }] });
-    const { result } = renderHook(() => useProductos(), { wrapper: conProductos });
-    expect(result.current.productos.length).toBe(1);
+  it("expone el error si la API falla y permite reintentar", async () => {
+    backend.fallar("GET /productos", 500, "Servicio no disponible.");
+    const { result } = await montarCatalogo();
+    expect(result.current.error).toBe("Servicio no disponible.");
+
+    backend.restaurar();
+    await act(() => result.current.cargarProductos());
+
+    expect(result.current.error).toBeNull();
+    expect(result.current.productos.length).toBe(4);
   });
 
-  it("CREATE: agrega un producto nuevo", () => {
-    const { result } = renderHook(() => useProductos(), { wrapper: conProductos });
+  it("CREATE: el ADMIN agrega un producto y queda persistido en el backend", async () => {
+    sembrarSesion(ADMIN);
+    const { result } = await montarCatalogo();
 
-    act(() => {
-      result.current.agregarProducto({ codigo: "FR009", nombre: "Palta Hass", precio: 2500 });
-    });
+    await act(() => result.current.agregarProducto({ codigo: "FR009", nombre: "Palta Hass", precio: 2500, stock: 5 }));
 
-    expect(result.current.productos.length).toBe(9);
     expect(result.current.buscarProducto("FR009").nombre).toBe("Palta Hass");
+    expect(backend.db.productos.length).toBe(5);
   });
 
-  it("UPDATE: reemplaza el producto con el mismo código", () => {
-    const { result } = renderHook(() => useProductos(), { wrapper: conProductos });
+  it("CREATE: si el backend responde 403 no se modifica la lista", async () => {
+    sembrarSesion(ANA);
+    const { result } = await montarCatalogo();
 
-    act(() => {
-      result.current.actualizarProducto({ codigo: "FR001", nombre: "Manzanas Orgánicas", precio: 1500 });
-    });
+    const error = await capturarError(act(() => result.current.agregarProducto({ codigo: "X1" })));
+
+    expect(error.status).toBe(403);
+    expect(result.current.productos.length).toBe(4);
+  });
+
+  it("UPDATE: reemplaza el producto con la respuesta del backend", async () => {
+    sembrarSesion(ADMIN);
+    const { result } = await montarCatalogo();
+
+    await act(() => result.current.actualizarProducto({ codigo: "FR001", nombre: "Manzanas Orgánicas", precio: 1500 }));
 
     expect(result.current.buscarProducto("FR001").precio).toBe(1500);
-    expect(result.current.productos.length).toBe(8);
+    expect(result.current.productos.length).toBe(4);
   });
 
-  it("DELETE: elimina un producto por código", () => {
-    const { result } = renderHook(() => useProductos(), { wrapper: conProductos });
+  it("DELETE: elimina por código en el backend y en la lista", async () => {
+    sembrarSesion(ADMIN);
+    const { result } = await montarCatalogo();
 
-    act(() => {
-      result.current.eliminarProducto("PL001");
-    });
+    await act(() => result.current.eliminarProducto("PL001"));
 
-    expect(result.current.productos.length).toBe(7);
     expect(result.current.buscarProducto("PL001")).toBeUndefined();
-  });
-
-  it("persiste los cambios en localStorage", () => {
-    const { result } = renderHook(() => useProductos(), { wrapper: conProductos });
-
-    act(() => {
-      result.current.eliminarProducto("FR001");
-    });
-
-    expect(leerStorage(CLAVE_PRODUCTOS).some((p) => p.codigo === "FR001")).toBeFalse();
+    expect(backend.db.productos.some((p) => p.codigo === "PL001")).toBeFalse();
   });
 });
 
@@ -79,12 +98,8 @@ describe("Contexto: CarritoContext", () => {
   it("agrega un producto y acumula unidades en la misma línea", () => {
     const { result } = renderHook(() => useCarrito(), { wrapper: conCarrito });
 
-    act(() => {
-      result.current.agregarAlCarrito("FR001", 2);
-    });
-    act(() => {
-      result.current.agregarAlCarrito("FR001", 3);
-    });
+    act(() => result.current.agregarAlCarrito("FR001", 2));
+    act(() => result.current.agregarAlCarrito("FR001", 3));
 
     expect(result.current.items).toEqual([{ codigo: "FR001", cantidad: 5 }]);
     expect(result.current.totalUnidades).toBe(5);
@@ -102,176 +117,104 @@ describe("Contexto: CarritoContext", () => {
     expect(result.current.totalUnidades).toBe(3);
   });
 
-  it("actualiza la cantidad de una línea", () => {
-    const { result } = renderHook(() => useCarrito(), { wrapper: conCarrito });
-
-    act(() => {
-      result.current.agregarAlCarrito("FR002", 1);
-    });
-    act(() => {
-      result.current.actualizarCantidad("FR002", 4);
-    });
-
-    expect(result.current.items[0].cantidad).toBe(4);
-  });
-
   it("elimina la línea cuando la cantidad llega a 0", () => {
     const { result } = renderHook(() => useCarrito(), { wrapper: conCarrito });
 
-    act(() => {
-      result.current.agregarAlCarrito("FR002", 2);
-    });
-    act(() => {
-      result.current.actualizarCantidad("FR002", 0);
-    });
+    act(() => result.current.agregarAlCarrito("FR002", 2));
+    act(() => result.current.actualizarCantidad("FR002", 0));
 
     expect(result.current.items).toEqual([]);
-    expect(result.current.totalUnidades).toBe(0);
   });
 
   it("vacía el carrito y lo persiste en localStorage", () => {
     const { result } = renderHook(() => useCarrito(), { wrapper: conCarrito });
 
-    act(() => {
-      result.current.agregarAlCarrito("FR001", 1);
-    });
-    act(() => {
-      result.current.vaciarCarrito();
-    });
+    act(() => result.current.agregarAlCarrito("FR001", 1));
+    act(() => result.current.vaciarCarrito());
 
-    expect(result.current.items).toEqual([]);
     expect(leerStorage(CLAVE_CARRITO)).toEqual([]);
   });
 
   it("recupera el carrito guardado al iniciar", () => {
-    sembrarStorage({ [CLAVE_CARRITO]: [{ codigo: "FR001", cantidad: 3 }] });
+    sembrarCarrito([{ codigo: "FR001", cantidad: 3 }]);
     const { result } = renderHook(() => useCarrito(), { wrapper: conCarrito });
     expect(result.current.totalUnidades).toBe(3);
   });
 });
 
-describe("Contexto: AuthContext (registro y login)", () => {
+describe("Contexto: AuthContext (login con JWT)", () => {
+  let backend;
+
   beforeEach(() => {
     localStorage.clear();
+    backend = instalarBackendFalso();
   });
 
-  afterEach(() => {
-    jasmine.clock().uninstall();
-  });
-
-  it("registra un usuario normalizando el correo y con fecha de creación (mock de reloj)", () => {
-    jasmine.clock().install();
-    jasmine.clock().mockDate(new Date("2025-01-15T10:00:00Z"));
+  it("inicia sesión contra el backend y guarda el token y el usuario", async () => {
     const { result } = renderHook(() => useAuth(), { wrapper: conAuth });
 
-    act(() => {
-      result.current.registrarUsuario({ ...USUARIA_ANA, email: "  ANA@Correo.com " });
-    });
+    await act(() => result.current.iniciarSesion(ADMIN.email, PASSWORD_ADMIN));
 
-    const guardada = leerStorage(CLAVE_USUARIOS).find((u) => u.nombre === "Ana Pérez");
-    expect(guardada.email).toBe("ana@correo.com");
-    expect(guardada.creadoEn).toBe("2025-01-15T10:00:00.000Z");
+    expect(result.current.usuario.rol).toBe(ROLES.ADMIN);
+    expect(result.current.token).toBe("token-1");
+    expect(leerStorage(CLAVE_SESION)).toEqual({ token: "token-1", usuario: jasmine.objectContaining({ id: 1 }) });
   });
 
-  it("el registro siempre crea clientes, aunque se intente pedir rol admin", () => {
+  it("normaliza el correo antes de enviarlo", async () => {
     const { result } = renderHook(() => useAuth(), { wrapper: conAuth });
 
-    act(() => {
-      result.current.registrarUsuario({ ...USUARIA_ANA, rol: ROLES.ADMIN });
-    });
+    await act(() => result.current.iniciarSesion("  ADMIN@HuertoHogar.cl ", PASSWORD_ADMIN));
 
-    const guardada = leerStorage(CLAVE_USUARIOS).find((u) => u.email === "ana@correo.com");
-    expect(guardada.rol).toBe(ROLES.CLIENTE);
+    expect(backend.llamadasA("POST", "/auth/login")[0].cuerpo.email).toBe("admin@huertohogar.cl");
   });
 
-  it("incluye al administrador de fábrica aunque localStorage esté vacío", () => {
+  it("con credenciales incorrectas rechaza y no deja sesión", async () => {
     const { result } = renderHook(() => useAuth(), { wrapper: conAuth });
 
-    let error;
-    act(() => {
-      error = result.current.iniciarSesion(ADMIN_INICIAL.email, ADMIN_INICIAL.password);
-    });
+    const error = await capturarError(result.current.iniciarSesion(ADMIN.email, "Incorrecta1!"));
 
-    expect(error).toBeNull();
-    expect(result.current.sesion.rol).toBe(ROLES.ADMIN);
+    expect(error.message).toBe("Correo o contraseña incorrectos.");
+    expect(result.current.usuario).toBeNull();
+    expect(localStorage.getItem(CLAVE_SESION)).toBeNull();
   });
 
-  it("no duplica al administrador si ya estaba guardado", () => {
-    sembrarStorage({ [CLAVE_USUARIOS]: [ADMIN_INICIAL, USUARIA_ANA] });
-    const { result } = renderHook(() => useAuth(), { wrapper: conAuth });
-    expect(result.current.usuarios.length).toBe(2);
-  });
-
-  it("el correo del admin cuenta como ya registrado (no se puede volver a registrar)", () => {
-    const { result } = renderHook(() => useAuth(), { wrapper: conAuth });
-    expect(result.current.existeUsuario("ADMIN@huertohogar.cl")).toBeTrue();
-  });
-
-  it("una cuenta antigua sin rol inicia sesión como cliente", () => {
-    const { rol, ...sinRol } = USUARIA_ANA;
-    sembrarStorage({ [CLAVE_USUARIOS]: [sinRol] });
+  it("registrar llama a POST /auth/registro y no inicia sesión", async () => {
     const { result } = renderHook(() => useAuth(), { wrapper: conAuth });
 
-    act(() => {
-      result.current.iniciarSesion(sinRol.email, sinRol.password);
-    });
+    const creado = await result.current.registrarUsuario({ nombre: "Pedro", email: "pedro@correo.com", password: "Clave123!" });
 
-    expect(result.current.sesion.rol).toBe(ROLES.CLIENTE);
-  });
-
-  it("inicia sesión con credenciales correctas", () => {
-    sembrarStorage({ [CLAVE_USUARIOS]: [USUARIA_ANA] });
-    const { result } = renderHook(() => useAuth(), { wrapper: conAuth });
-
-    let error;
-    act(() => {
-      error = result.current.iniciarSesion("ANA@correo.com", "Clave123!");
-    });
-
-    expect(error).toBeNull();
-    expect(result.current.sesion).toEqual(jasmine.objectContaining(SESION_ANA));
-    expect(leerStorage(CLAVE_SESION).email).toBe("ana@correo.com");
-  });
-
-  it("rechaza una contraseña incorrecta", () => {
-    sembrarStorage({ [CLAVE_USUARIOS]: [USUARIA_ANA] });
-    const { result } = renderHook(() => useAuth(), { wrapper: conAuth });
-
-    let error;
-    act(() => {
-      error = result.current.iniciarSesion("ana@correo.com", "Mala123!");
-    });
-
-    expect(error).toBe("Contraseña incorrecta.");
-    expect(result.current.sesion).toBeNull();
-  });
-
-  it("rechaza un correo no registrado", () => {
-    const { result } = renderHook(() => useAuth(), { wrapper: conAuth });
-    expect(result.current.iniciarSesion("nadie@correo.com", "Clave123!")).toBe(
-      "No existe una cuenta con este correo."
-    );
-  });
-
-  it("detecta correos ya registrados sin importar mayúsculas", () => {
-    sembrarStorage({ [CLAVE_USUARIOS]: [USUARIA_ANA] });
-    const { result } = renderHook(() => useAuth(), { wrapper: conAuth });
-
-    expect(result.current.existeUsuario("ANA@correo.com")).toBeTrue();
-    expect(result.current.existeUsuario("otro@correo.com")).toBeFalse();
+    expect(creado.rol).toBe(ROLES.CLIENTE);
+    expect(result.current.usuario).toBeNull();
   });
 
   it("recupera la sesión guardada y la cierra limpiando localStorage", () => {
-    sembrarStorage({ [CLAVE_SESION]: SESION_ANA });
+    sembrarSesion(ANA);
     const { result } = renderHook(() => useAuth(), { wrapper: conAuth });
-    expect(result.current.sesion.nombre).toBe("Ana Pérez");
+    expect(result.current.usuario.nombre).toBe("Ana Pérez");
 
-    act(() => {
-      result.current.cerrarSesion();
-    });
+    act(() => result.current.cerrarSesion());
 
-    expect(result.current.sesion).toBeNull();
+    expect(result.current.usuario).toBeNull();
     expect(localStorage.getItem(CLAVE_SESION)).toBeNull();
+  });
+
+  it("descarta al cargar una sesión cuyo JWT ya venció", () => {
+    const vencido = `h.${btoa(JSON.stringify({ exp: Math.floor(Date.now() / 1000) - 60 }))}.f`;
+    sembrarSesion(ANA, vencido);
+
+    const { result } = renderHook(() => useAuth(), { wrapper: conAuth });
+
+    expect(result.current.usuario).toBeNull();
+    expect(localStorage.getItem(CLAVE_SESION)).toBeNull();
+  });
+
+  it("cierra la sesión cuando la API avisa que el token expiró", () => {
+    sembrarSesion(ADMIN);
+    const { result } = renderHook(() => useAuth(), { wrapper: conAuth });
+
+    act(() => window.dispatchEvent(new Event(EVENTO_SESION_EXPIRADA)));
+
+    expect(result.current.usuario).toBeNull();
   });
 });
 

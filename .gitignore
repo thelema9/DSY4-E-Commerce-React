@@ -4,3 +4,9 @@ coverage
 .DS_Store
 *.local
 docs/
+
+# Variables de entorno y credenciales: nunca al repositorio (se usan secrets de GitHub).
+.env
+.env.*
+!.env.example
+*.pem
