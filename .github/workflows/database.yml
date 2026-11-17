@@ -1,5 +1,4 @@
 # CI/CD de la BASE DE DATOS (carpeta database/): valida los scripts SQL → EC2 de base de datos (MySQL en Docker).
-# Solo se ejecuta cuando cambia algo dentro de database/ (o este workflow).
 #
 # Importante: schema.sql y seed.sql se aplican solo la PRIMERA vez (volumen vacío).
 # Volver a desplegar no borra ni reemplaza los datos existentes.
@@ -10,13 +9,15 @@
 name: Database CI/CD
 
 on:
+  # Solo cuando cambia algo dentro de database/ (o el script de preparación / este workflow).
   push:
-    # preparacion_backend: rama para probar el despliegue antes de llevarlo a main
-    branches: [main, preparacion_backend]
+    branches: [main]
     paths: ["database/**", "scripts/**", ".github/workflows/database.yml"]
+  # En los pull requests a main solo se ejecutan las pruebas (no se despliega).
   pull_request:
     branches: [main]
     paths: ["database/**", "scripts/**", ".github/workflows/database.yml"]
+  # También se puede ejecutar a mano: Actions → (workflow) → Run workflow.
   workflow_dispatch:
 
 concurrency:

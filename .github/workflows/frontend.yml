@@ -1,5 +1,4 @@
 # CI/CD del FRONTEND (raíz del repo): pruebas (Jasmine + Karma) → build (Vite) → EC2 de frontend (nginx en Docker).
-# No se ejecuta cuando el cambio es solo del backend o de la base de datos.
 #
 # GitHub → Settings → Secrets and variables → Actions (secrets y variables del repositorio):
 #   Secrets:   FRONT_EC2_HOST, FRONT_EC2_SSH_KEY, EC2_USER
@@ -7,13 +6,15 @@
 name: Frontend CI/CD
 
 on:
+  # Solo cuando cambia el frontend: cualquier cosa fuera de backend/, database/ y la documentación.
   push:
-    # preparacion_backend: rama para probar el despliegue antes de llevarlo a main
-    branches: [main, preparacion_backend]
-    paths-ignore: ["backend/**", "database/**", ".github/workflows/backend.yml", ".github/workflows/database.yml", "docs/**"]
+    branches: [main]
+    paths-ignore: ["backend/**", "database/**", ".github/workflows/backend.yml", ".github/workflows/database.yml", "docs/**", "entregables/**"]
+  # En los pull requests a main solo se ejecutan las pruebas (no se despliega).
   pull_request:
     branches: [main]
-    paths-ignore: ["backend/**", "database/**", ".github/workflows/backend.yml", ".github/workflows/database.yml", "docs/**"]
+    paths-ignore: ["backend/**", "database/**", ".github/workflows/backend.yml", ".github/workflows/database.yml", "docs/**", "entregables/**"]
+  # También se puede ejecutar a mano: Actions → (workflow) → Run workflow.
   workflow_dispatch:
 
 concurrency:

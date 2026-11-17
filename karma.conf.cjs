@@ -79,6 +79,7 @@ module.exports = function (config) {
       reporters: [
         { type: "html", subdir: "html" },
         { type: "lcovonly", subdir: ".", file: "lcov.info" },
+        { type: "json-summary", subdir: ".", file: "coverage-summary.json" }, // números por archivo (informe)
         { type: "text" },
         { type: "text-summary" },
       ],

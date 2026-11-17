@@ -62,6 +62,11 @@ npm run build      # build de producción en dist/
 
 Los archivos `.env*` están en `.gitignore` (salvo `.env.example`): **no se suben credenciales al repositorio**.
 
+## Entregables EP3 + EFT
+
+Todo lo que pide la pauta está en [entregables/](entregables/README.md): **ERS** ([Markdown](entregables/ERS.md) / [PDF](entregables/ERS.pdf)),
+**informe de cobertura** ([PDF](entregables/informe-cobertura.pdf)) y **capturas de la demo** ([entregables/capturas/](entregables/capturas/)).
+
 ## Usuarios y roles
 
 Los usuarios viven en la base de datos MySQL del backend; el frontend **no** tiene credenciales escritas en el código.
@@ -89,13 +94,13 @@ en `ApiError` (`status`, `message`, `errores` por campo) y avisa a la app cuando
 
 ## Despliegue en AWS (3 EC2 con GitHub Actions)
 
-Hay un workflow por parte. Cada uno se ejecuta cuando cambia su carpeta y despliega por SSH en **su** EC2:
+Hay un workflow por parte. En cada push a `main`, **solo se ejecuta el de la carpeta que cambió**, y despliega por SSH en **su** EC2:
 
 | Workflow | Se ejecuta cuando cambia | Qué hace | EC2 |
 |---|---|---|---|
-| [database.yml](.github/workflows/database.yml) | `database/**` | Valida `schema.sql` y `seed.sql` en un MySQL de prueba → copia `database/` → escribe `.env` → `docker compose up` | BD |
-| [backend.yml](.github/workflows/backend.yml) | `backend/**` | `./mvnw verify` → imagen Docker en GHCR → copia `docker-compose.yml` → escribe `.env` → `docker compose up` → espera `/actuator/health` | back |
-| [frontend.yml](.github/workflows/frontend.yml) | todo lo demás (raíz) | `npm test` (artefacto `cobertura`) → `npm run build` con `VITE_API_URL` → copia `dist/` y `deploy/` → reinicia nginx | front |
+| [database.yml](.github/workflows/database.yml) | `database/**` o `scripts/**` | Valida `schema.sql` y `seed.sql` en un MySQL de prueba → copia `database/` → escribe `.env` → `docker compose up` | BD |
+| [backend.yml](.github/workflows/backend.yml) | `backend/**` o `scripts/**` | `./mvnw verify` → imagen Docker en GHCR → copia `docker-compose.yml` → escribe `.env` → `docker compose up` → espera `/actuator/health` | back |
+| [frontend.yml](.github/workflows/frontend.yml) | todo lo demás (raíz), salvo `docs/` y `entregables/` | `npm test` (artefacto `cobertura`) → `npm run build` con `VITE_API_URL` → copia `dist/` y `deploy/` → reinicia nginx | front |
 
 En los pull requests solo se ejecutan las pruebas y validaciones. Todos se pueden lanzar a mano en
 **Actions → (workflow) → Run workflow**. **En el primer despliegue ejecútalos en este orden: Database → Backend → Frontend.**
