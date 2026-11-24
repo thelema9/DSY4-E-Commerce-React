@@ -1,0 +1,14 @@
+# Contexto de la imagen del frontend (Dockerfile de la raíz): solo lo necesario para compilar React.
+node_modules
+dist
+coverage
+backend
+database
+entregables
+docs
+scripts
+.git
+.github
+.env
+.env.*
+*.pem

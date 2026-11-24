@@ -37,7 +37,35 @@ Navegador ──:80───▶ │ nginx: sirve el build de React (deploy/)  �
 
 ## Puesta en marcha (local)
 
-Cada parte se levanta por separado, igual que en AWS:
+### Opción rápida: todo con un solo comando
+
+El [docker-compose.yml](docker-compose.yml) de la raíz levanta MySQL, la API y el frontend juntos. Solo requiere Docker:
+
+```bash
+cp .env.example .env              # una sola vez: completar DB_PASSWORD, DB_ROOT_PASSWORD, JWT_SECRET, ADMIN_PASSWORD y CLIENTE_DEMO_PASSWORD
+docker compose up -d --build      # el primer arranque compila todo y crea la base (unos minutos)
+```
+
+| Servicio | URL |
+|---|---|
+| Frontend | http://localhost:3000 |
+| API | http://localhost:8080/api · Swagger en http://localhost:8080/swagger-ui.html |
+| MySQL | `localhost:3306` (usuario `huerto_app` o `root`, con las contraseñas del `.env`) |
+
+Funciona igual que en AWS: el navegador llama a la API en otro origen y CORS solo permite `http://localhost:3000`.
+Los puertos se cambian en el `.env` (`WEB_PORT`, `API_PORT`, `DB_PORT_LOCAL`).
+
+```bash
+docker compose logs -f api        # ver los logs de la API
+docker compose down               # apagar (los datos se mantienen)
+docker compose down -v            # apagar y borrar la base (la próxima vez se recrea desde schema.sql y seed.sql)
+```
+
+Con Postman se usa el entorno **HuertoHogar - Local** (`baseUrl = http://localhost:8080/api`).
+
+### Opción por partes (como en AWS)
+
+Cada parte se levanta por separado, igual que en las 3 EC2:
 
 ```bash
 # 1) Base de datos (MySQL en localhost:3306)
@@ -199,7 +227,9 @@ DSY4-E-Commerce-React/
 ├── package.json
 ├── vite.config.js              # proxy /api → backend en desarrollo
 ├── karma.conf.cjs              # Karma + Jasmine + cobertura (define VITE_API_URL para las pruebas)
-├── .env.example                # variables de entorno del frontend
+├── .env.example                # variables de entorno (frontend y docker compose local)
+├── docker-compose.yml          # todo en local con un comando: MySQL + API + frontend
+├── Dockerfile                  # imagen del frontend para el compose local (build de Vite + nginx)
 ├── deploy/                     # EC2 front
 │   ├── docker-compose.yml      # nginx en el puerto 80
 │   └── nginx.conf              # sirve la SPA

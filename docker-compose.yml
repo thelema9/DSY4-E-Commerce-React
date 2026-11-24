@@ -1,0 +1,82 @@
+# HuertoHogar completo en LOCAL con un solo comando: MySQL + API Spring Boot + frontend React.
+#
+#   cp .env.example .env      # completar las contraseñas (una sola vez)
+#   docker compose up -d --build
+#
+#   Frontend → http://localhost:3000        API → http://localhost:8080/api
+#   Swagger  → http://localhost:8080/swagger-ui.html      MySQL → localhost:3306
+#
+# Es la misma arquitectura que en AWS (3 partes separadas, el navegador llama a la API y CORS activo),
+# pero en contenedores de una sola máquina. En AWS cada parte usa su propio compose
+# (database/, backend/ y deploy/) y su workflow de GitHub Actions; este archivo no se usa allá.
+#
+# Apagar: docker compose down          Borrar también los datos: docker compose down -v
+name: huertohogar-local
+
+services:
+  db:
+    image: mysql:8.0
+    container_name: huertohogar-local-db
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${DB_NAME:-huertohogar}
+      MYSQL_USER: ${DB_USER:-huerto_app}
+      MYSQL_PASSWORD: ${DB_PASSWORD:?Falta DB_PASSWORD en .env (ver .env.example)}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?Falta DB_ROOT_PASSWORD en .env (ver .env.example)}
+      TZ: America/Santiago
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+    ports:
+      - "${DB_PORT_LOCAL:-3306}:3306"   # para consultar con MySQL Workbench o la terminal
+    volumes:
+      - mysql_data:/var/lib/mysql
+      # Solo la primera vez (volumen vacío): crean las tablas y cargan los datos iniciales.
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./database/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "MYSQL_PWD=\"$$MYSQL_ROOT_PASSWORD\" mysqladmin ping -h 127.0.0.1 -u root --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 60
+      start_period: 60s
+
+  api:
+    build: ./backend
+    image: huertohogar-api:local
+    container_name: huertohogar-local-api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy   # la API arranca cuando MySQL ya acepta conexiones
+    environment:
+      DB_HOST: db                    # nombre del servicio: Docker lo resuelve en su red interna
+      DB_PORT: 3306
+      DB_NAME: ${DB_NAME:-huertohogar}
+      DB_USER: ${DB_USER:-huerto_app}
+      DB_PASSWORD: ${DB_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET:?Falta JWT_SECRET en .env (openssl rand -base64 48)}
+      JWT_EXPIRATION_MS: ${JWT_EXPIRATION_MS:-3600000}
+      CORS_ALLOWED_ORIGINS: http://localhost:${WEB_PORT:-3000}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@huertohogar.cl}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Falta ADMIN_PASSWORD en .env (ver .env.example)}
+      CLIENTE_DEMO_EMAIL: ${CLIENTE_DEMO_EMAIL:-cliente@huertohogar.cl}
+      CLIENTE_DEMO_PASSWORD: ${CLIENTE_DEMO_PASSWORD:-}
+    ports:
+      - "${API_PORT:-8080}:8080"
+
+  web:
+    build:
+      context: .
+      args:
+        # El navegador (fuera de Docker) llama a la API por el puerto publicado en el host.
+        VITE_API_URL: http://localhost:${API_PORT:-8080}/api
+    image: huertohogar-web:local
+    container_name: huertohogar-local-web
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "${WEB_PORT:-3000}:80"
+
+volumes:
+  mysql_data:
+    name: huertohogar-local-mysql-data   # distinto del volumen de database/docker-compose.yml
