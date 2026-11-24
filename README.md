@@ -23,10 +23,11 @@ Navegador ──:80───▶ │ nginx: sirve el build de React (deploy/)  �
                     └───────────────────────────────────────────┘    privada     └──────────────────────────┘
 ```
 
-| URL pública | Ejemplo |
+| URL pública | Despliegue actual |
 |---|---|
-| Frontend | `http://<IP-front>/` |
-| Backend (API, Postman) | `http://<IP-back>:8080/api/productos` |
+| Frontend | http://184.194.132.141/ |
+| Backend (API, Postman) | http://98.91.143.211:8080/api/productos |
+| Swagger | http://98.91.143.211:8080/swagger-ui.html |
 | Base de datos | **no es pública**: el puerto 3306 solo acepta conexiones desde el security group del backend |
 
 ## Requisitos
@@ -94,8 +95,10 @@ Los archivos `.env*` están en `.gitignore` (salvo `.env.example`): **no se sube
 
 ## Entregables EP3 + EFT
 
-Todo lo que pide la pauta está en [entregables/](entregables/README.md): **ERS** ([Markdown](entregables/ERS.md) / [PDF](entregables/ERS.pdf)),
-**informe de cobertura** ([PDF](entregables/informe-cobertura.pdf)) y **capturas de la demo** ([entregables/capturas/](entregables/capturas/)).
+Todo lo que pide la pauta está en [entregables/](entregables/README.md). Los archivos que se suben a AVA (PDF y proyectos
+comprimidos) están juntos en [entregables/entrega-AVA/](entregables/entrega-AVA/): **ERS** ([PDF](entregables/entrega-AVA/ERS.pdf) /
+[Markdown](entregables/ERS.md)), **manual de usuario**, **documentación de APIs**, **documento de APIs e integración**,
+**informe de cobertura** y los zip del frontend y del backend. Las **capturas de la demo** están en [entregables/capturas/](entregables/capturas/).
 
 ## Usuarios y roles
 

@@ -10,3 +10,6 @@ docs/
 .env.*
 !.env.example
 *.pem
+
+# Entregables: los Word son fuentes locales; al repositorio y a AVA van los PDF
+*.docx

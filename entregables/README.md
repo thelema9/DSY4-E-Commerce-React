@@ -2,10 +2,17 @@
 
 **Integrantes:** Fabian Palma · Juan Salas
 
+Los archivos para subir a AVA están juntos en [entrega-AVA/](entrega-AVA/).
+
 | Entregable (pauta) | Archivo |
 |---|---|
-| ERS actualizado | [ERS.md](ERS.md) · [ERS.pdf](ERS.pdf) |
-| Informe de cobertura de pruebas | [informe-cobertura.pdf](informe-cobertura.pdf) · [captura del reporte Istanbul](capturas/20-cobertura-istanbul.png) |
+| Proyecto frontend comprimido | [HuertoHogar-frontend.zip](entrega-AVA/HuertoHogar-frontend.zip) |
+| Proyecto backend comprimido (incluye `database/`) | [HuertoHogar-backend.zip](entrega-AVA/HuertoHogar-backend.zip) |
+| ERS actualizado | [ERS.pdf](entrega-AVA/ERS.pdf) · [ERS.md](ERS.md) |
+| Manual de usuario con capturas (Anexo 4) | [Manual-de-usuario-HuertoHogar.pdf](entrega-AVA/Manual-de-usuario-HuertoHogar.pdf) |
+| Documentación de APIs (Anexo 3) | [Documentacion-APIs-HuertoHogar.pdf](entrega-AVA/Documentacion-APIs-HuertoHogar.pdf) · [Excel](Documentacion-APIs-HuertoHogar.xlsx) |
+| Documento de APIs e integración | [Documento-APIs-e-Integracion-HuertoHogar.pdf](entrega-AVA/Documento-APIs-e-Integracion-HuertoHogar.pdf) |
+| Informe de cobertura de pruebas | [informe-cobertura.pdf](entrega-AVA/informe-cobertura.pdf) · [captura del reporte Istanbul](capturas/20-cobertura-istanbul.png) |
 | Capturas de la demo (login, restricciones por rol, ambos CRUD, persistencia) | [capturas/](capturas/) |
 | Colección Postman | [Colección](../backend/postman/HuertoHogar.postman_collection.json) · entornos [AWS](../backend/postman/HuertoHogar-AWS.postman_environment.json) y [Local](../backend/postman/HuertoHogar-Local.postman_environment.json) · [instrucciones](../backend/README.md#colección-postman) |
 | Script y respaldo de la base de datos | [../database/schema.sql](../database/schema.sql) · [../database/seed.sql](../database/seed.sql) · [../database/backup.sh](../database/backup.sh) |
@@ -13,7 +20,9 @@
 
 ## Capturas de la demo
 
-Tomadas sobre el despliegue real en AWS (frontend `http://52.90.43.206`, backend `http://3.82.7.248:8080`).
+Tomadas sobre el despliegue real en AWS. URLs actuales: frontend http://184.194.132.141,
+backend http://98.91.143.211:8080/api (Swagger en http://98.91.143.211:8080/swagger-ui.html).
+Las capturas se tomaron antes de reiniciar las EC2, por eso las IP que aparecen en ellas pueden no coincidir.
 El producto `DEMO01` y el usuario `usuario.demo@huertohogar.cl` se crearon para la demo y se eliminaron al final.
 
 | # | Qué muestra | Requisito |

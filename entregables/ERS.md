@@ -256,7 +256,7 @@ El diagrama de arquitectura y de datos está en `docs/arquitectura.drawio`.
 
 | Tipo | Herramienta | Alcance | Resultado |
 |---|---|---|---|
-| Unitarias e integración del frontend | Jasmine + Karma + Testing Library | Componentes, contextos, páginas, servicios y validaciones, con un backend falso que replica la API | 156/156 · cobertura de líneas del 98,05 % (`entregables/informe-cobertura.pdf`) |
+| Unitarias e integración del frontend | Jasmine + Karma + Testing Library | Componentes, contextos, páginas, servicios y validaciones, con un backend falso que replica la API | 156/156 · cobertura de líneas del 98,05 % (`entregables/entrega-AVA/informe-cobertura.pdf`) |
 | Integración del backend | JUnit 5 + MockMvc (H2) | Endpoints, seguridad (401/403), validaciones y reglas de negocio | 34/34 |
 | Validación SQL | GitHub Actions + MySQL 8 | `schema.sql` y `seed.sql` (idempotente) | OK en cada cambio de `database/` |
 | De punta a punta | Pruebas sobre las URL públicas | Login por rol, 403 para CLIENTE, ambos CRUD, persistencia y CORS | 20/20 sobre el despliegue en AWS |
@@ -283,6 +283,6 @@ El diagrama de arquitectura y de datos está en `docs/arquitectura.drawio`.
 | CRUD de productos (REST) sobre MySQL | RF-09 a RF-17 | Capturas 05 a 10 y 19 |
 | CRUD de usuarios solo para ADMIN | RF-23 a RF-29 | Capturas 12 a 14 y 18 |
 | Integración front + back (servicios, variable de entorno, CORS, carga y error) | RNF-04, RNF-08, RNF-10 | `src/services/`, captura 01 |
-| Pruebas unitarias con cobertura | RNF-11 | `entregables/informe-cobertura.pdf`, captura 20 |
+| Pruebas unitarias con cobertura | RNF-11 | `entregables/entrega-AVA/informe-cobertura.pdf`, captura 20 |
 | Despliegue en la nube con secretos fuera del repositorio | RNF-05, RNF-06, RNF-12 a RNF-14 | `.github/workflows/`, URL públicas |
 | Documentación (README, Postman, respaldo de BD) | RNF-15 | `README.md`, `backend/postman/`, `database/` |
