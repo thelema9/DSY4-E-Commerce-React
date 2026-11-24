@@ -1,5 +1,7 @@
 # DSY1104 - HuertoHogar: React + Spring Boot + MySQL
 
+**Integrantes:** Fabian Palma · Juan Salas
+
 E-commerce **HuertoHogar** (EP3 + EFT). Un solo repositorio con las tres partes del sistema. Cada parte se
 despliega en **su propia instancia AWS EC2** con su propio workflow de GitHub Actions:
 
@@ -186,7 +188,7 @@ Luego abre `http://<IP-front>/` desde otra red o computador, como recomienda la 
 | Sin datos quemados | Productos, categorías del footer, usuarios y cupones vienen de la API. Solo queda `src/data/regiones.js` (listado de regiones/comunas del formulario) |
 | Persistencia en MySQL + script de BD | `database/schema.sql`, `database/seed.sql`, `database/backup.sh` |
 | Pruebas unitarias + cobertura | `src/tests/` (156 pruebas Jasmine/Karma) y `coverage/` · `backend/src/test/` (34 pruebas) |
-| Colección Postman | `backend/postman/HuertoHogar.postman_collection.json` |
+| Colección Postman | `backend/postman/` (colección con 40 requests + entornos AWS y Local) |
 | Despliegue en la nube, secretos fuera del repo | `.github/workflows/` (3 workflows, 3 EC2), secrets de GitHub, `.gitignore` |
 
 ## Estructura
@@ -203,7 +205,7 @@ DSY4-E-Commerce-React/
 │   └── nginx.conf              # sirve la SPA
 ├── backend/                    # EC2 back (ver backend/README.md)
 │   ├── src/                    # código y pruebas (JUnit + MockMvc)
-│   ├── postman/                # colección Postman
+│   ├── postman/                # colección Postman + entornos AWS y Local
 │   ├── Dockerfile
 │   └── docker-compose.yml      # API en el puerto 8080
 ├── scripts/preparar-ec2.sh      # instala Docker y prepara cada EC2 (lo ejecutan los workflows)

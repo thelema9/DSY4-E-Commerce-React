@@ -150,10 +150,41 @@ Los usuarios no van en los scripts SQL: los crea la API al arrancar, porque sus 
 
 ## Colección Postman
 
-[postman/HuertoHogar.postman_collection.json](postman/HuertoHogar.postman_collection.json) trae 32 requests, cada una con
-la prueba de su código esperado: Auth, Productos, Usuarios y Cupones, incluidos los casos 400, 401, 403, 404 y 409.
+En [postman/](postman/) hay una colección y dos entornos:
 
-1. Importa la colección y completa las variables `baseUrl` (`http://<IP-back>:8080/api` o `http://localhost:8080/api`),
-   `adminPassword` y `clientePassword`.
-2. Ejecuta primero los dos login: guardan los tokens.
-3. Ejecuta el resto en orden, o todo con el Runner.
+| Archivo | Para qué |
+|---|---|
+| [HuertoHogar.postman_collection.json](postman/HuertoHogar.postman_collection.json) | 40 requests en 4 carpetas (Auth, Productos, Usuarios, Cupones). Cada una prueba su código HTTP (200, 201, 204, 400, 401, 403, 404, 409) y, cuando corresponde, el contenido de la respuesta |
+| [HuertoHogar-AWS.postman_environment.json](postman/HuertoHogar-AWS.postman_environment.json) | Entorno para la demo contra la URL pública (`http://<IP-back>:8080/api`) |
+| [HuertoHogar-Local.postman_environment.json](postman/HuertoHogar-Local.postman_environment.json) | Entorno para el backend local (`http://localhost:8080/api`) |
+
+Cómo usarla:
+
+1. En Postman: **Import** → la colección y el entorno que corresponda.
+2. En el entorno completa `baseUrl` con la IP actual del backend, `adminPassword` y `clientePassword`
+   (valores de los secrets `ADMIN_PASSWORD` y `CLIENTE_DEMO_PASSWORD`). Las contraseñas son de tipo *secret* y
+   **no se guardan en el repositorio**. Si falta alguna, la colección lo avisa antes de enviar la request.
+3. Selecciona el entorno y ejecuta todo con **Run collection** (Runner), o request por request en orden:
+   los dos login del principio guardan los tokens.
+
+La colección se puede ejecutar varias veces seguidas: los correos de prueba llevan un sufijo único y el
+producto `FR009` se borra antes de crearlo, por si una ejecución anterior quedó a medias.
+
+Qué cubre, en relación con la pauta:
+
+| Pauta | Requests |
+|---|---|
+| Login y registro contra el backend; JWT | `Auth / Login ADMIN`, `Login CLIENTE`, `Registro de cliente → 201`, `Login con la cuenta recién registrada` |
+| Contraseñas nunca expuestas | Los login, el registro y `Usuarios / Listar como ADMIN` verifican que no venga `password` ni `passwordHash` |
+| Endpoints protegidos (401 sin token, 403 CLIENTE) | `Crear sin token → 401`, `Crear/Editar/Eliminar FR009 como CLIENTE → 403`, `Usuarios / Listar sin token → 401`, `Listar/Cambiar rol/Eliminar como CLIENTE → 403` |
+| CRUD de productos con validaciones | `Listar`, `Detalle`, `Crear → 201`, `Crear repetido → 409`, `Crear inválido → 400` (precio y stock), `Editar → 200`, `Eliminar → 204`, `Verificar eliminado → 404` |
+| CRUD de usuarios (solo ADMIN) | `Crear → 201`, `Detalle`, `Editar`, `Cambiar rol`, `Desactivar`, `Login con usuario desactivado → 403`, `Eliminar → 204` |
+| Evidencia de persistencia (MySQL) | `Verificar que la edición persiste`, `Verificar que rol y estado persisten`, `Verificar eliminado → 404` |
+
+Por línea de comandos (opcional), con [Newman](https://www.npmjs.com/package/newman):
+
+```bash
+cd backend/postman
+npx newman run HuertoHogar.postman_collection.json -e HuertoHogar-AWS.postman_environment.json \
+  --env-var baseUrl=http://<IP-back>:8080/api --env-var adminPassword='...' --env-var clientePassword='...'
+```

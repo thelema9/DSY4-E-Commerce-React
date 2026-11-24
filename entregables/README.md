@@ -1,11 +1,13 @@
 # Entregables EP3 + EFT · HuertoHogar
 
+**Integrantes:** Fabian Palma · Juan Salas
+
 | Entregable (pauta) | Archivo |
 |---|---|
 | ERS actualizado | [ERS.md](ERS.md) · [ERS.pdf](ERS.pdf) |
 | Informe de cobertura de pruebas | [informe-cobertura.pdf](informe-cobertura.pdf) · [captura del reporte Istanbul](capturas/20-cobertura-istanbul.png) |
 | Capturas de la demo (login, restricciones por rol, ambos CRUD, persistencia) | [capturas/](capturas/) |
-| Colección Postman | [../backend/postman/HuertoHogar.postman_collection.json](../backend/postman/HuertoHogar.postman_collection.json) |
+| Colección Postman | [Colección](../backend/postman/HuertoHogar.postman_collection.json) · entornos [AWS](../backend/postman/HuertoHogar-AWS.postman_environment.json) y [Local](../backend/postman/HuertoHogar-Local.postman_environment.json) · [instrucciones](../backend/README.md#colección-postman) |
 | Script y respaldo de la base de datos | [../database/schema.sql](../database/schema.sql) · [../database/seed.sql](../database/seed.sql) · [../database/backup.sh](../database/backup.sh) |
 | README con arquitectura, endpoints, instalación y credenciales | [../README.md](../README.md) · [../backend/README.md](../backend/README.md) |
 

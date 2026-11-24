@@ -1,30 +1,10 @@
 {
   "info": {
     "name": "HuertoHogar API",
-    "description": "Endpoints principales de la API de HuertoHogar (EP3/EFT).\n\n1. Ajusta las variables de la colección: baseUrl (ej. http://<IP-back>:8080/api o http://localhost:8080/api), adminPassword y clientePassword.\n2. Ejecuta primero 'Auth / Login ADMIN' y 'Auth / Login CLIENTE': guardan los tokens.\n3. Ejecuta el resto en orden (o con el Runner). Cada request verifica su código HTTP esperado.",
+    "description": "Endpoints principales de la API de HuertoHogar (EP3/EFT). 40 requests: cada una verifica su código HTTP y, cuando corresponde, el contenido de la respuesta.\n\nCómo usarla:\n1. Importa la colección y uno de los entornos de esta carpeta: 'HuertoHogar - AWS' (demo desde la URL pública) o 'HuertoHogar - Local'.\n2. En el entorno completa baseUrl (http://<IP-back>:8080/api), adminPassword y clientePassword (valores de los secrets ADMIN_PASSWORD y CLIENTE_DEMO_PASSWORD).\n3. Ejecuta toda la colección con el Runner, o request por request en orden. Los dos login guardan los tokens.\n\nSe puede ejecutar varias veces seguidas: los correos de prueba llevan un sufijo único y el producto FR009 se limpia antes de crearlo.\n\nPor línea de comandos: npx newman run HuertoHogar.postman_collection.json -e HuertoHogar-AWS.postman_environment.json --env-var adminPassword=... --env-var clientePassword=...",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    {
-      "key": "baseUrl",
-      "value": "http://localhost:8080/api"
-    },
-    {
-      "key": "adminEmail",
-      "value": "admin@huertohogar.cl"
-    },
-    {
-      "key": "adminPassword",
-      "value": ""
-    },
-    {
-      "key": "clienteEmail",
-      "value": "cliente@huertohogar.cl"
-    },
-    {
-      "key": "clientePassword",
-      "value": ""
-    },
     {
       "key": "tokenAdmin",
       "value": ""
@@ -35,6 +15,14 @@
     },
     {
       "key": "usuarioId",
+      "value": ""
+    },
+    {
+      "key": "emailRegistro",
+      "value": ""
+    },
+    {
+      "key": "emailUsuario",
       "value": ""
     }
   ],
@@ -52,7 +40,9 @@
                 "exec": [
                   "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
                   "const datos = pm.response.json();",
+                  "pm.test(\"Entrega un JWT\", () => pm.expect(datos.token.split(\".\")).to.have.length(3));",
                   "pm.test(\"Rol ADMIN\", () => pm.expect(datos.usuario.rol).to.eql(\"ADMIN\"));",
+                  "pm.test(\"No expone la contraseña\", () => pm.expect(datos.usuario).to.not.have.any.keys(\"password\", \"passwordHash\"));",
                   "pm.collectionVariables.set(\"tokenAdmin\", datos.token);"
                 ]
               }
@@ -148,7 +138,8 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"Responde 401\", () => pm.response.to.have.status(401));"
+                  "pm.test(\"Responde 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"Trae mensaje de error\", () => pm.expect(pm.response.json().mensaje).to.be.a(\"string\"));"
                 ]
               }
             }
@@ -190,12 +181,24 @@
           "name": "Registro de cliente → 201 (rol CLIENTE aunque pida ADMIN)",
           "event": [
             {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Correo único: la colección se puede ejecutar varias veces sin chocar con el 409.",
+                  "pm.collectionVariables.set(\"emailRegistro\", `ana.postman.${Date.now()}@correo.com`);"
+                ]
+              }
+            },
+            {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
                   "pm.test(\"Responde 201\", () => pm.response.to.have.status(201));",
-                  "pm.test(\"Se crea como CLIENTE\", () => pm.expect(pm.response.json().rol).to.eql(\"CLIENTE\"));"
+                  "const u = pm.response.json();",
+                  "pm.test(\"Se crea como CLIENTE aunque pida ADMIN\", () => pm.expect(u.rol).to.eql(\"CLIENTE\"));",
+                  "pm.test(\"No expone la contraseña\", () => pm.expect(u).to.not.have.any.keys(\"password\", \"passwordHash\"));"
                 ]
               }
             }
@@ -221,7 +224,7 @@
             "description": "",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"nombre\": \"Ana Postman\",\n  \"email\": \"ana.postman@correo.com\",\n  \"password\": \"Clave123!\",\n  \"telefono\": null,\n  \"region\": \"Región Metropolitana de Santiago\",\n  \"comuna\": \"Santiago\",\n  \"rol\": \"ADMIN\"\n}",
+              "raw": "{\n  \"nombre\": \"Ana Postman\",\n  \"email\": \"{{emailRegistro}}\",\n  \"password\": \"Clave123!\",\n  \"telefono\": null,\n  \"region\": \"Región Metropolitana de Santiago\",\n  \"comuna\": \"Santiago\",\n  \"rol\": \"ADMIN\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -267,7 +270,7 @@
             "description": "",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"nombre\": \"Ana Postman\",\n  \"email\": \"ana.postman@correo.com\",\n  \"password\": \"Clave123!\",\n  \"region\": \"Región Metropolitana de Santiago\",\n  \"comuna\": \"Santiago\"\n}",
+              "raw": "{\n  \"nombre\": \"Ana Postman\",\n  \"email\": \"{{emailRegistro}}\",\n  \"password\": \"Clave123!\",\n  \"region\": \"Región Metropolitana de Santiago\",\n  \"comuna\": \"Santiago\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -280,6 +283,53 @@
           }
         },
         {
+          "name": "Login con la cuenta recién registrada → 200",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Rol CLIENTE\", () => pm.expect(pm.response.json().usuario.rol).to.eql(\"CLIENTE\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "El registro quedó guardado en MySQL con la contraseña hasheada (BCrypt) y se puede iniciar sesión.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{emailRegistro}}\",\n  \"password\": \"Clave123!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
           "name": "Registro inválido → 400 con errores por campo",
           "event": [
             {
@@ -288,7 +338,8 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test(\"Responde 400\", () => pm.response.to.have.status(400));",
-                  "pm.test(\"Trae errores por campo\", () => pm.expect(pm.response.json().errores).to.have.property(\"email\"));"
+                  "const errores = pm.response.json().errores;",
+                  "pm.test(\"Trae errores por campo\", () => pm.expect(errores).to.include.keys(\"nombre\", \"email\", \"password\"));"
                 ]
               }
             }
@@ -334,7 +385,8 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));"
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Es el cliente demo\", () => pm.expect(pm.response.json().email).to.eql(pm.variables.get(\"clienteEmail\")));"
                 ]
               }
             }
@@ -410,7 +462,10 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));"
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "const lista = pm.response.json();",
+                  "pm.test(\"Lista con productos desde MySQL\", () => pm.expect(lista).to.be.an(\"array\").that.is.not.empty);",
+                  "pm.test(\"Cada producto trae código, precio y stock\", () => lista.forEach(p => pm.expect(p).to.include.keys(\"codigo\", \"precio\", \"stock\")));"
                 ]
               }
             }
@@ -441,7 +496,8 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));"
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Es FR001\", () => pm.expect(pm.response.json().codigo).to.eql(\"FR001\"));"
                 ]
               }
             }
@@ -598,11 +654,27 @@
           "name": "Crear como ADMIN → 201",
           "event": [
             {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Limpieza: si una ejecución anterior quedó a medias, borra FR009 antes de crearlo (ignora el 404).",
+                  "pm.sendRequest({",
+                  "  url: pm.variables.get(\"baseUrl\") + \"/productos/FR009\",",
+                  "  method: \"DELETE\",",
+                  "  header: { Authorization: \"Bearer \" + pm.collectionVariables.get(\"tokenAdmin\") },",
+                  "}, () => {});"
+                ]
+              }
+            },
+            {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"Responde 201\", () => pm.response.to.have.status(201));"
+                  "pm.test(\"Responde 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"Devuelve el producto creado\", () => pm.expect(pm.response.json().codigo).to.eql(\"FR009\"));",
+                  "pm.test(\"Header Location\", () => pm.expect(pm.response.headers.get(\"Location\")).to.include(\"/api/productos/FR009\"));"
                 ]
               }
             }
@@ -706,7 +778,8 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"Responde 400\", () => pm.response.to.have.status(400));"
+                  "pm.test(\"Responde 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Rechaza precio y stock\", () => pm.expect(pm.response.json().errores).to.include.keys(\"precio\", \"stock\"));"
                 ]
               }
             }
@@ -751,6 +824,59 @@
           }
         },
         {
+          "name": "Editar FR009 como CLIENTE → 403",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 403\", () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/productos/FR009",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "FR009"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"codigo\": \"FR009\",\n  \"nombre\": \"Palta Hass Premium\",\n  \"categoria\": \"Frutas Frescas\",\n  \"atributo\": \"Cremosa\",\n  \"precio\": 2900,\n  \"stock\": 12,\n  \"unidad\": \"kilo\",\n  \"descripcion\": \"Paltas maduras listas para comer.\",\n  \"imagen\": \"https://images.unsplash.com/photo-1523049673857-eb18f1d7b578\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCliente}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
           "name": "Editar FR009 → 200",
           "event": [
             {
@@ -758,7 +884,8 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));"
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Nombre actualizado\", () => pm.expect(pm.response.json().nombre).to.eql(\"Palta Hass Premium\"));"
                 ]
               }
             }
@@ -800,6 +927,43 @@
                   "type": "string"
                 }
               ]
+            }
+          }
+        },
+        {
+          "name": "Verificar que la edición persiste → 200",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "const p = pm.response.json();",
+                  "pm.test(\"Nombre y precio editados quedaron en MySQL\", () => {",
+                  "  pm.expect(p.nombre).to.eql(\"Palta Hass Premium\");",
+                  "  pm.expect(p.precio).to.eql(2900);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/productos/FR009",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "productos",
+                "FR009"
+              ]
+            },
+            "description": "Evidencia de persistencia: se vuelve a leer el producto desde la API (MySQL).",
+            "auth": {
+              "type": "noauth"
             }
           }
         },
@@ -921,7 +1085,8 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));"
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Lista de categorías\", () => pm.expect(pm.response.json()).to.be.an(\"array\").that.is.not.empty);"
                 ]
               }
             }
@@ -949,6 +1114,37 @@
     {
       "name": "Usuarios (solo ADMIN)",
       "item": [
+        {
+          "name": "Listar sin token → 401",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 401\", () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/usuarios",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "usuarios"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
         {
           "name": "Listar como CLIENTE → 403",
           "event": [
@@ -995,7 +1191,11 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));"
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "const lista = pm.response.json();",
+                  "pm.test(\"Lista de usuarios\", () => pm.expect(lista).to.be.an(\"array\").that.is.not.empty);",
+                  "pm.test(\"Ningún usuario expone su contraseña ni el hash\", () =>",
+                  "  lista.forEach(u => pm.expect(u).to.not.have.any.keys(\"password\", \"passwordHash\")));"
                 ]
               }
             }
@@ -1029,12 +1229,23 @@
           "name": "Crear usuario → 201 (guarda usuarioId)",
           "event": [
             {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set(\"emailUsuario\", `pedro.postman.${Date.now()}@correo.com`);"
+                ]
+              }
+            },
+            {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
                   "pm.test(\"Responde 201\", () => pm.response.to.have.status(201));",
-                  "pm.collectionVariables.set(\"usuarioId\", pm.response.json().id);"
+                  "const u = pm.response.json();",
+                  "pm.test(\"Creado como CLIENTE y activo\", () => { pm.expect(u.rol).to.eql(\"CLIENTE\"); pm.expect(u.activo).to.eql(true); });",
+                  "pm.collectionVariables.set(\"usuarioId\", u.id);"
                 ]
               }
             }
@@ -1059,13 +1270,53 @@
             "description": "",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"nombre\": \"Pedro Soto\",\n  \"email\": \"pedro.postman@correo.com\",\n  \"password\": \"Clave123!\",\n  \"telefono\": \"+56912345678\",\n  \"region\": \"Región de Valparaíso\",\n  \"comuna\": \"Viña del Mar\",\n  \"rol\": \"CLIENTE\"\n}",
+              "raw": "{\n  \"nombre\": \"Pedro Soto\",\n  \"email\": \"{{emailUsuario}}\",\n  \"password\": \"Clave123!\",\n  \"telefono\": \"+56912345678\",\n  \"region\": \"Región de Valparaíso\",\n  \"comuna\": \"Viña del Mar\",\n  \"rol\": \"CLIENTE\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
                 }
               }
             },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdmin}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Detalle del usuario creado → 200",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Es el usuario creado\", () => pm.expect(pm.response.json().email).to.eql(pm.collectionVariables.get(\"emailUsuario\")));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/usuarios/{{usuarioId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "usuarios",
+                "{{usuarioId}}"
+              ]
+            },
+            "description": "",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -1086,7 +1337,8 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));"
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Nombre actualizado\", () => pm.expect(pm.response.json().nombre).to.eql(\"Pedro Soto Editado\"));"
                 ]
               }
             }
@@ -1132,6 +1384,60 @@
           }
         },
         {
+          "name": "Cambiar rol como CLIENTE → 403",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 403\", () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/usuarios/{{usuarioId}}/rol",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "usuarios",
+                "{{usuarioId}}",
+                "rol"
+              ]
+            },
+            "description": "Un CLIENTE no puede darse permisos de administrador aunque conozca la URL.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCliente}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rol\": \"ADMIN\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
           "name": "Cambiar rol a ADMIN → 200",
           "event": [
             {
@@ -1139,7 +1445,8 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));"
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Rol ADMIN\", () => pm.expect(pm.response.json().rol).to.eql(\"ADMIN\"));"
                 ]
               }
             }
@@ -1193,7 +1500,8 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));"
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Queda inactivo\", () => pm.expect(pm.response.json().activo).to.eql(false));"
                 ]
               }
             }
@@ -1227,6 +1535,94 @@
                 }
               }
             },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdmin}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Login con usuario desactivado → 403",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 403\", () => pm.response.to.have.status(403));",
+                  "pm.test(\"Mensaje de cuenta desactivada\", () => pm.expect(pm.response.json().mensaje).to.include(\"desactivada\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{emailUsuario}}\",\n  \"password\": \"Clave123!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Verificar que rol y estado persisten → 200",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "const u = pm.response.json();",
+                  "pm.test(\"Rol ADMIN e inactivo en MySQL\", () => { pm.expect(u.rol).to.eql(\"ADMIN\"); pm.expect(u.activo).to.eql(false); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/usuarios/{{usuarioId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "usuarios",
+                "{{usuarioId}}"
+              ]
+            },
+            "description": "",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -1369,7 +1765,8 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));"
+                  "pm.test(\"Responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"10 % de descuento\", () => pm.expect(pm.response.json().porcentaje).to.eql(0.1));"
                 ]
               }
             }
@@ -1426,6 +1823,22 @@
           }
         }
       ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Revisa que el entorno esté completo antes de cada request.",
+          "const faltantes = [\"baseUrl\", \"adminEmail\", \"adminPassword\", \"clienteEmail\", \"clientePassword\"]",
+          "  .filter(k => { const v = pm.variables.get(k); return !v || String(v).includes(\"<\"); });",
+          "if (faltantes.length) {",
+          "  throw new Error(\"Completa en el entorno: \" + faltantes.join(\", \") + \" (ver descripción de la colección).\");",
+          "}"
+        ]
+      }
     }
   ]
 }

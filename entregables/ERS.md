@@ -8,7 +8,7 @@
 | **Versión del documento** | 3.0 (actualizada para la entrega final integrada) |
 | **Fecha** | 17 de noviembre de 2026 |
 | **Repositorio** | https://github.com/thelema9/DSY4-E-Commerce-React |
-| **Integrantes** | _(completar con los nombres del equipo y el encargo de cada uno)_ |
+| **Integrantes** | Fabian Palma · Juan Salas |
 
 ## Historial de versiones
 
